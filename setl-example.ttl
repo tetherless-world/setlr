@@ -1,0 +1,74 @@
+@prefix rdf:           <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs:          <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:           <http://www.w3.org/2001/XMLSchema#> .
+@prefix owl:           <http://www.w3.org/2002/07/owl#> .
+@prefix skos:          <http://www.w3.org/2004/02/skos/core#> .
+@prefix prov:          <http://www.w3.org/ns/prov#> .
+@prefix sio:           <http://semanticscience.org/resource/> .
+@prefix dcat:          <http://www.w3.org/ns/dcat#> .
+@prefix dcterms:       <http://purl.org/dc/terms/> .
+@prefix void:          <http://rdfs.org/ns/void#> .
+@prefix foaf:          <http://xmlns.com/foaf/0.1/> .
+@prefix ov:            <http://open.vocab.org/terms/> .
+@prefix setl:          <http://purl.org/twc/vocab/setl/> .
+@prefix csvw:          <http://www.w3.org/ns/csvw#> .
+@prefix pv:            <http://purl.org/net/provenance/ns#>.
+
+@prefix :              <https://example.com/data/> .
+
+@prefix chear:    <http://hadatac.org/ont/chear#> .
+
+
+@prefix s:              <http://wwwn.cdc.gov/Nchs/Nhanes/2013-2014/DEMO_H> .
+@prefix sd:              <https://hbgd.tw.rpi.edu/source/ghap-io/dataset/ki1126927-GUSTO/> .
+@prefix sdv:              <https://hbgd.tw.rpi.edu/source/ghap-io/dataset/ki1126927-GUSTO/version/2016-02/> .
+
+
+<nhanes_2013-2014_demo.trig> a pv:File;
+    dcterms:format "application/trig";
+    prov:wasGeneratedBy [
+      a setl:Load;
+      prov:used <http://wwwn.cdc.gov/Nchs/Nhanes/2013-2014/DEMO_H>;
+    ].
+
+<http://wwwn.cdc.gov/Nchs/Nhanes/2013-2014/DEMO_H> a void:Dataset, dcat:Dataset;
+  prov:wasGeneratedBy [
+    a setl:Transform, setl:JSLDT;
+    prov:used :table;
+    setl:hasContext '''{
+  "@vocab" : "http://hadatac.org/ont/chear#",
+  "dataset" : "http://wwwn.cdc.gov/Nchs/Nhanes/2013-2014/DEMO_H/",
+  "sio" : "http://semanticscience.org/resource/",
+  "chear" : "http://hadatac.org/ont/chear#"
+}''';
+    prov:value '''[
+  {
+    "@id" : "dataset:{{row.SEQN|int}}",
+    "@type" : "sio:Human",
+    "sio:hasAttribute" : [
+        {
+          "@if" : "row.RIAGENDR != '.' and not isnan(row.RIAGENDR)",
+          "@type": ["sio:Attribute", "sio:BiologicalSex", "{{{1.0:'sio:Male',2.0:'sio:Female'}[row.RIAGENDR]}}"]
+        },
+        {
+          "@if" : "row.RIDAGEYR != '.' and not isnan(row.RIDAGEYR)",
+          "@type": ["sio:Attribute", "sio:Age", "sio:Year"],
+          "sio:hasValue": { "@value" : "{{row.RIDAGEYR}}", "@type":"xsd:decimal"}
+        },
+        {
+          "@if" : "row.RIDAGEMN != '.' and not isnan(row.RIDAGEMN)",
+          "@type": ["sio:Attribute", "sio:Age", "sio:Month"],
+          "sio:hasValue": { "@value" : "{{row.RIDAGEMN}}", "@type":"xsd:decimal"}
+        }
+    ]
+  }
+]'''
+  ].
+
+
+
+:table a setl:XPORT, setl:Table;
+  prov:wasGeneratedBy [
+    a setl:Extract;
+    prov:used <http://wwwn.cdc.gov/Nchs/Nhanes/2013-2014/DEMO_H.XPT>;
+  ].
