@@ -24,7 +24,8 @@ setup(
         'rdflib-jsonld',
         'pandas',
         'requests',
-        'toposort'
+        'toposort',
+        'requests-testadapter'
     ],
     entry_points = {
         'console_scripts': ['setlr=setlr:main'],

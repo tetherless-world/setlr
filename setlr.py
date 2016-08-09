@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# -*- coding: utf-8 -*-
 
 from rdflib import *
 import rdflib
@@ -7,10 +8,19 @@ import json
 import sys, collections
 import requests
 import pandas
+import re
 from jinja2 import Template
 from toposort import toposort_flatten
 from StringIO import StringIO
 from numpy import isnan
+import uuid
+
+import hashlib
+
+def hash(value):
+    m = hashlib.sha256()
+    m.update(value.encode('utf-8'))
+    return m.hexdigest()
 
 csvw = Namespace('http://www.w3.org/ns/csvw#')
 ov = Namespace('http://open.vocab.org/terms/')
@@ -23,6 +33,25 @@ dc = Namespace('http://purl.org/dc/terms/')
 
 sys.setrecursionlimit(10000)
 
+from requests_testadapter import Resp
+
+class LocalFileAdapter(requests.adapters.HTTPAdapter):
+    def build_response_from_file(self, request):
+        file_path = request.url[7:]
+        with open(file_path, 'rb') as file:
+            buff = bytearray(os.path.getsize(file_path))
+            file.readinto(buff)
+            resp = Resp(buff)
+            r = self.build_response(request, resp)
+            return r
+    def send(self, request, stream=False, timeout=None,
+             verify=True, cert=None, proxies=None):
+        return self.build_response_from_file(request)
+
+requests_session = requests.session()
+requests_session.mount('file://', LocalFileAdapter())
+requests_session.mount('file:///', LocalFileAdapter())
+    
 datatypeConverters = collections.defaultdict(lambda: str)
 datatypeConverters.update({
     XSD.string: str,
@@ -36,20 +65,30 @@ run_samples = False
 
 def read_csv(location, result):
     args = dict(
-        sep = result.value(csvw.delimiter),
-        header = range(result.value(csvw.headerRowCount)),
-        skiprows = result.value(csvw.skipRows)
+        sep = result.value(csvw.delimiter, default=Literal(",")).value,
+        #header = result.value(csvw.headerRow, default=Literal(0)).value),
+        skiprows = result.value(csvw.skipRows, default=Literal(0)).value
     )
     if result.value(csvw.header):
         args['header'] = [0]
-    return pandaas.read_csv(location,**args)
+    result = pandas.read_csv(location,encoding='utf-8', **args)
+    return result
+
+def get_content(location):
+    if location.startswith("file://"):
+        return open(location[7:],'rb')
+    else:
+        return StringIO(requests.get(location).content)
 
 extractors = {
-    setl.XPORT : lambda location, result: pandas.read_sas(StringIO(requests.get(location).content), format='xport'),
-    setl.SAS7BDAT : lambda location, result: pandas.read_sas(StringIO(requests.get(location).content), format='sas7bdat'),
-    csvw.Table : read_csv
+    setl.XPORT : lambda location, result: pandas.read_sas(get_content(location), format='xport'),
+    setl.SAS7BDAT : lambda location, result: pandas.read_sas(get_content(location), format='sas7bdat'),
+    csvw.Table : read_csv,
+    void.Dataset : 
 }
 
+
+    
 def load_csv(csv_resource):
     column_descriptions = {}
     for col in csv_resource[csvw.column]:
@@ -100,6 +139,7 @@ formats = {
     "application/rdf+xml":'xml',
     "text/rdf":'xml',
     'text/turtle':'turtle',
+    'application/turtle':'turtle',
     'application/x-turtle':'turtle',
     'text/plain':'nt',
     'text/n3':'n3',
@@ -133,14 +173,37 @@ def extract(e, resources):
                 print "Extracted", result.identifier
                 resources[result.identifier] = extractors[t.identifier](used.identifier, result)
                 return
-            
+
+def isempty(value):
+    try:
+        return isnan(value)
+    except:
+        return value is None
+
+def clone(value):
+    __doc__ = '''This is only a JSON-level cloning of objects. Atomic objects are invariant, and don't need to be cloned.'''
+    if isinstance(value, list):
+        return [x for x in value]
+    elif isinstance(value, dict):
+        return dict(value)
+    else:
+        return value
+    
 def json_transform(transform, resources):
     print "Transforming", transform.identifier
     tables = [u for u in transform[prov.used] if u[RDF.type:setl.Table]]
 
     def process_row(row, template, rowname):
         result = []
-        e = {'row':row, 'name': rowname, 'template': template}
+        e = {'row':row,
+             'name': rowname,
+             'template': template,
+             "transform": transform,
+             "setl_graph": transform.graph,
+             "isempty":isempty,
+             "hash":hash
+        }
+        e.update(rdflib.__dict__)
         todo = [[x, result, e] for x in template]
         while len(todo) > 0:
             task, parent, env = todo.pop()
@@ -153,12 +216,47 @@ def json_transform(transform, resources):
                 key = kt.render(**env)
             if isinstance(value, dict):
                 if '@if' in value:
-                    incl = eval(value['@if'], globals(), env)
-                    if not incl:
-                        continue
+                    try:
+                        incl = eval(value['@if'], globals(), env)
+                        if not incl:
+                            continue
+                    except Exception as e:
+                        trace = sys.exc_info()[2]
+                        print "Error in conditional", value['@if']
+                        print "Locals:", env.keys()
+                        raise e, None, trace
+                if '@for' in value:
+                    f = value['@for']
+                    if isinstance(f, list):
+                        f = ' '.join(f)
+                    variable, expression = f.split(" in ", 1)
+                    variable = variable.strip()
+                    val = value
+                    if '@do' in value:
+                        val = value['@do']
+                    else:
+                        del val['@for']
+                    try:
+                        values = eval(expression, globals(), env)
+                        if values is not None:
+                            for v in values:
+                                new_env = dict(env)
+                                new_env[variable] = v
+                                child = clone(val)
+                                todo.append((child, parent, new_env))
+                    except KeyError:
+                        pass
+                    except Exception as e:
+                        trace = sys.exc_info()[2]
+                        print "Error in for:", value['@for']
+                        print "Locals:", env.keys()
+                        raise e, None, trace
+                    continue
                 this = {}
                 for child in value.items():
                     if child[0] == '@if':
+                        continue
+                    if child[0] == '@for':
                         continue
                     todo.append((child, this, env))
             elif isinstance(value, list):
@@ -166,8 +264,13 @@ def json_transform(transform, resources):
                 for child in value:
                     todo.append((child, this, env))
             elif isinstance(value, unicode):
-                template = Template(value)
-                this = template.render(**env)
+                try:
+                    template = Template(unicode(value))
+                    this = template.render(**env)
+                except Exception as e:
+                    trace = sys.exc_info()[2]
+                    print "Error in template", value, type(value)
+                    raise e, None, trace
             else:
                 this = value
 
@@ -180,9 +283,17 @@ def json_transform(transform, resources):
     generated = list(transform.subjects(prov.wasGeneratedBy))[0]
     print "Generating", generated.identifier
 
-    result = ConjunctiveGraph()
+    result = resources[generated.identifier] if generated.identifier in resources else ConjunctiveGraph()
     s = transform.value(prov.value).value
-    jslt = json.loads(s)
+    try:
+        jslt = json.loads(s)
+    except Exception as e:
+        trace = sys.exc_info()[2]
+        if 'line' in e.message:
+            line = int(re.search("line ([0-9]+)", e.message).group(1))
+            print "Error in parsing JSON Template at line %d:" % line
+            print '\n'.join(["%d: %s"%(i+line-3, x) for i, x in enumerate(s.split("\n")[line-3:line+4])])
+        raise e, None, trace
     context = transform.value(setl.hasContext)
     if context is not None:
         context = json.loads(context.value)
@@ -259,12 +370,14 @@ def transform(transform_resource, resources):
     for result in transform_graph.subjects(prov.wasGeneratedBy):
         graphs[result.identifier] = transform_graph
 
+        
 def load(load_resource, resources):
     print 'Loading',load_resource.identifier
     file_graph = ConjunctiveGraph()
     for used in load_resource[prov.used]:
         print "Using",used.identifier
         used_graph = resources[used.identifier]
+        file_graph.namespace_manager = used_graph.namespace_manager
         #print used_graph.serialize(format="trig")
         file_graph.addN(used_graph.quads())
 
