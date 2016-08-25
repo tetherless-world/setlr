@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 from rdflib import *
+from rdflib.util import guess_format
 import rdflib
 import csv
 import json
@@ -30,6 +31,7 @@ pv = Namespace('http://purl.org/net/provenance/ns#')
 sp = Namespace('http://spinrdf.org/sp#')
 sd = Namespace('http://www.w3.org/ns/sparql-service-description#')
 dc = Namespace('http://purl.org/dc/terms/')
+void = Namespace('http://rdfs.org/ns/void#')
 
 sys.setrecursionlimit(10000)
 
@@ -71,8 +73,38 @@ def read_csv(location, result):
     )
     if result.value(csvw.header):
         args['header'] = [0]
-    result = pandas.read_csv(location,encoding='utf-8', **args)
-    return result
+    df = pandas.read_csv(location,encoding='utf-8', **args)
+    return df
+
+_rdf_formats_to_guess = [
+    'xml',
+    'json-ld',
+    'trig',
+    'nquads',
+    'trix'
+]
+    
+def read_graph(location, result, g = None):
+    if g is None:
+        g = Dataset(default_union=True)
+    graph = g.graph(result.identifier)
+    if len(graph) == 0:
+        data = get_content(location).read()
+        f = guess_format(location)
+        for fmt in [f] + _rdf_formats_to_guess:
+            try:
+                graph.parse(data=data, format=fmt)
+                break
+            except Exception as e:
+                #print e
+                pass
+        if len(graph) == 0:
+            print "Could not parse graph: ", location
+        for ontology in graph.subjects(RDF.type, OWL.Ontology):
+            imports = [graph.resource(x) for x in graph.objects(ontology, OWL.imports)]
+            for i in imports:
+                read_graph(i.identifier, i, g = g)
+    return g
 
 def get_content(location):
     if location.startswith("file://"):
@@ -84,7 +116,8 @@ extractors = {
     setl.XPORT : lambda location, result: pandas.read_sas(get_content(location), format='xport'),
     setl.SAS7BDAT : lambda location, result: pandas.read_sas(get_content(location), format='sas7bdat'),
     csvw.Table : read_csv,
-    void.Dataset : 
+    OWL.Ontology : read_graph,
+    void.Dataset : read_graph
 }
 
 
@@ -155,7 +188,10 @@ def get_order(setl_graph):
             task = setl_graph.resource(task)
             for used in task[prov.used]:
                 nodes[task.identifier].add(used.identifier)
-        
+
+            for usage in task[prov.qualifiedUsage]:
+                used = usage.value(prov.entity)
+                nodes[task.identifier].add(used.identifier)
             for generated in task.subjects(prov.wasGeneratedBy):
                 nodes[generated.identifier].add(task.identifier)
     
@@ -192,6 +228,12 @@ def clone(value):
 def json_transform(transform, resources):
     print "Transforming", transform.identifier
     tables = [u for u in transform[prov.used] if u[RDF.type:setl.Table]]
+    variables = {}
+    for usage in transform[prov.qualifiedUsage]:
+        used = usage.value(prov.entity)
+        role = usage.value(prov.hadRole)
+        roleID  = role.value(dc.identifier)
+        variables[roleID.value] = resources[used.identifier]
 
     def process_row(row, template, rowname):
         result = []
@@ -203,6 +245,7 @@ def json_transform(transform, resources):
              "isempty":isempty,
              "hash":hash
         }
+        e.update(variables)
         e.update(rdflib.__dict__)
         todo = [[x, result, e] for x in template]
         while len(todo) > 0:
@@ -229,8 +272,8 @@ def json_transform(transform, resources):
                     f = value['@for']
                     if isinstance(f, list):
                         f = ' '.join(f)
-                    variable, expression = f.split(" in ", 1)
-                    variable = variable.strip()
+                    variable_list, expression = f.split(" in ", 1)
+                    variable_list = re.split(',\s+', variable_list.strip())
                     val = value
                     if '@do' in value:
                         val = value['@do']
@@ -240,8 +283,11 @@ def json_transform(transform, resources):
                         values = eval(expression, globals(), env)
                         if values is not None:
                             for v in values:
+                                if len(variable_list) == 1:
+                                    v = [v]
                                 new_env = dict(env)
-                                new_env[variable] = v
+                                for i, variable in enumerate(variable_list):
+                                    new_env[variable] = v[i]
                                 child = clone(val)
                                 todo.append((child, parent, new_env))
                     except KeyError:
@@ -427,9 +473,10 @@ def main():
         run_samples = True
         print "Only processing a few sample rows."
     setl_graph = ConjunctiveGraph()
-    setl_graph.parse(open(setl_file), format="turtle")
+    content = open(setl_file).read()
+    setl_graph.parse(data=content, format="turtle")
 
     graphs = _setl(setl_graph)
                 
 if __name__ == '__main__':
-    main(sys.argv[1])
+    main()
