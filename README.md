@@ -13,3 +13,7 @@ virtualenv --no-site-packages venv
 source venv/bin/activate
 pip install -e .
 ```
+
+# Learning how to SETL
+
+To learn how to use setlr please visit [the tutorial wiki page](https://github.com/tetherless-world/setlr/wiki/SETLr-Tutorial).
