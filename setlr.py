@@ -235,10 +235,12 @@ def json_transform(transform, resources):
         roleID  = role.value(dc.identifier)
         variables[roleID.value] = resources[used.identifier]
 
-    def process_row(row, template, rowname):
+    def process_row(row, template, rowname, table, resources):
         result = []
         e = {'row':row,
              'name': rowname,
+             'table': table,
+             'resources': resources,
              'template': template,
              "transform": transform,
              "setl_graph": transform.graph,
@@ -353,7 +355,7 @@ def json_transform(transform, resources):
             try:
                 root = {
                     "@id": generated.identifier,
-                    "@graph": process_row(row, jslt, rowname)
+                    "@graph": process_row(row, jslt, rowname, table, resources)
                 }
                 if context is not None:
                     root['@context'] = context
