@@ -15,6 +15,7 @@ from toposort import toposort_flatten
 from StringIO import StringIO
 from numpy import isnan
 import uuid
+import tempfile
 
 import hashlib
 
@@ -100,10 +101,11 @@ def read_graph(location, result, g = None):
                 pass
         if len(graph) == 0:
             print "Could not parse graph: ", location
-        for ontology in graph.subjects(RDF.type, OWL.Ontology):
-            imports = [graph.resource(x) for x in graph.objects(ontology, OWL.imports)]
-            for i in imports:
-                read_graph(i.identifier, i, g = g)
+        if result[RDF.type:OWL.Ontology]:
+            for ontology in graph.subjects(RDF.type, OWL.Ontology):
+                imports = [graph.resource(x) for x in graph.objects(ontology, OWL.imports)]
+                for i in imports:
+                    read_graph(i.identifier, i, g = g)
     return g
 
 def get_content(location):
@@ -117,10 +119,17 @@ extractors = {
     setl.SAS7BDAT : lambda location, result: pandas.read_sas(get_content(location), format='sas7bdat'),
     csvw.Table : read_csv,
     OWL.Ontology : read_graph,
-    void.Dataset : read_graph
+    void.Dataset : read_graph,
+    setl.JSON : lambda location, result: json.load(get_content(location)),
+    setl.XML : lambda location, result: ET.fromstring(get_content(location).read())
 }
 
-
+try:
+    from bs4 import BeautifulSoup
+    extractors[setl.HTML] = lambda location, result: BeautifulSoup(get_content(location).read(), 'html.parser')
+except:
+    pass
+    
     
 def load_csv(csv_resource):
     column_descriptions = {}
@@ -227,7 +236,7 @@ def clone(value):
     
 def json_transform(transform, resources):
     print "Transforming", transform.identifier
-    tables = [u for u in transform[prov.used] if u[RDF.type:setl.Table]]
+    tables = [u for u in transform[prov.used]]
     variables = {}
     for usage in transform[prov.qualifiedUsage]:
         used = usage.value(prov.entity)
@@ -331,7 +340,17 @@ def json_transform(transform, resources):
     generated = list(transform.subjects(prov.wasGeneratedBy))[0]
     print "Generating", generated.identifier
 
-    result = resources[generated.identifier] if generated.identifier in resources else ConjunctiveGraph()
+    if generated.identifier in resources:
+        result = resources[generated.identifier]
+    else:
+        storeType = 'Memory'
+        if generated[RDF.type : setl.Persisted]:
+            storeType = 'Sleepycat'
+        result = ConjunctiveGraph(store=storeType)
+        if generated[RDF.type : setl.Persisted]:
+            tempdir = tempfile.mkdtemp()
+            print "Persisting", generated.identifier, "to", tempdir
+            result.store.open(tempdir, True)
     s = transform.value(prov.value).value
     try:
         jslt = json.loads(s)
@@ -350,8 +369,13 @@ def json_transform(transform, resources):
         table = resources[t.identifier]
         if run_samples:
             table = table.head()
-        print "Transforming", len(table.index), "rows."
-        for rowname, row in table.iterrows():
+        it = [(0, table)]
+        if isinstance(table, pandas.DataFrame):
+            it = table.iterrows()
+            print "Transforming", len(table.index), "rows."
+        else:
+            print "Transforming", t.identifier
+        for rowname, row in it:
             try:
                 root = {
                     "@id": generated.identifier,
@@ -362,11 +386,15 @@ def json_transform(transform, resources):
                 #graph = ConjunctiveGraph(identifier=generated.identifier)
                 #graph.parse(data=json.dumps(root),format="json-ld")
                 result.parse(data=json.dumps(root), format="json-ld")
+                sys.stdout.write('\r')
+                sys.stdout.write("Row "+str(rowname))
+                sys.stdout.flush()
+
             except Exception as e:
                 trace = sys.exc_info()[2]
                 print "Error on", rowname, row
                 raise e, None, trace
-
+        print ""
     resources[generated.identifier] = result
     
     
@@ -421,13 +449,16 @@ def transform(transform_resource, resources):
         
 def load(load_resource, resources):
     print 'Loading',load_resource.identifier
-    file_graph = ConjunctiveGraph()
+    file_graph = ConjunctiveGraph(store='Sleepycat')
+    tempdir = tempfile.mkdtemp()
+    print "Gathering", load_resource.identifier, "into", tempdir
+    file_graph.store.open(tempdir, True)
     for used in load_resource[prov.used]:
         print "Using",used.identifier
         used_graph = resources[used.identifier]
         file_graph.namespace_manager = used_graph.namespace_manager
         #print used_graph.serialize(format="trig")
-        file_graph.addN(used_graph.quads())
+        file_graph += used_graph
 
     for generated in load_resource.subjects(prov.wasGeneratedBy):
         # TODO: support LDP-based loading
