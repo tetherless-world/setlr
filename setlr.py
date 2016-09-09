@@ -346,7 +346,6 @@ def json_transform(transform, resources):
         result = ConjunctiveGraph()
         if generated[RDF.type : setl.Persisted]:
             result = ConjunctiveGraph(store="Sleepycat")
-        result = ConjunctiveGraph(store=storeType)
         if generated[RDF.type : setl.Persisted]:
             tempdir = tempfile.mkdtemp()
             print "Persisting", generated.identifier, "to", tempdir
