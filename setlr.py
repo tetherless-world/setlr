@@ -343,9 +343,9 @@ def json_transform(transform, resources):
     if generated.identifier in resources:
         result = resources[generated.identifier]
     else:
-        storeType = 'Memory'
+        result = ConjunctiveGraph()
         if generated[RDF.type : setl.Persisted]:
-            storeType = 'Sleepycat'
+            result = ConjunctiveGraph(store="Sleepycat")
         result = ConjunctiveGraph(store=storeType)
         if generated[RDF.type : setl.Persisted]:
             tempdir = tempfile.mkdtemp()
