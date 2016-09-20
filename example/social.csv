@@ -1,0 +1,5 @@
+ID,Name,MarriedTo,Knows,DOB
+Alice,Alice Smith,Bob,Bob; Charles,1/12/1983
+Bob,Bob Smith,Alice,Alice; Charles,3/23/1985
+Charles,Charles Brown,,Alice; Bob,12/15/1955
+Dave,Dave Jones,,,4/25/1967

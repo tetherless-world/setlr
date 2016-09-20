@@ -1,0 +1,45 @@
+@prefix prov:          <http://www.w3.org/ns/prov#> .
+@prefix dcat:          <http://www.w3.org/ns/dcat#> .
+@prefix dcterms:       <http://purl.org/dc/terms/> .
+@prefix void:          <http://rdfs.org/ns/void#> .
+@prefix setl:          <http://purl.org/twc/vocab/setl/> .
+@prefix csvw:          <http://www.w3.org/ns/csvw#> .
+@prefix pv:            <http://purl.org/net/provenance/ns#> .
+@prefix :              <http://example.com/setl/> .
+
+:table a csvw:Table, setl:Table;
+  csvw:delimiter ",";
+  prov:wasGeneratedBy [
+    a setl:Extract;
+    prov:used <social.csv>;
+  ].
+
+
+<http://example.com/social> a void:Dataset;
+  prov:wasGeneratedBy [
+    a setl:Transform, setl:JSLDT;
+    prov:used :table;
+    setl:hasContext '''{
+  "foaf" : "http://xmlns.com/foaf/0.1/"
+}''';
+    prov:value '''[{
+  "@id": "https://example.com/social/{{row.ID}}",
+  "@type": "foaf:Person",
+  "foaf:name": "{{row.Name}}",
+  "http://schema.org/spouse": [{
+    "@if" : "not isempty(row.MarriedTo)",
+    "@id" : "https://example.com/social/{{row.ID}}"
+  }],
+  "foaf:knows": [{
+    "@if" : "not isempty(row.Knows)",
+    "@for" : "friend in row.Knows.split('; ')",
+    "@do" : { "@id" : "https://example.com/social/{{friend}}" }
+  }]
+}]'''].
+
+<social.ttl> a pv:File;
+    dcterms:format "text/turtle";
+    prov:wasGeneratedBy [
+      a setl:Load;
+      prov:used <http://example.com/social> ;
+    ].

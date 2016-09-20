@@ -1,0 +1,27 @@
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
+@prefix ns1: <http://schema.org/> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xml: <http://www.w3.org/XML/1998/namespace> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<https://example.com/social/Dave> a foaf:Person ;
+    foaf:name "Dave Jones" .
+
+<https://example.com/social/Charles> a foaf:Person ;
+    foaf:knows <https://example.com/social/Alice>,
+        <https://example.com/social/Bob> ;
+    foaf:name "Charles Brown" .
+
+<https://example.com/social/Alice> a foaf:Person ;
+    ns1:spouse <https://example.com/social/Alice> ;
+    foaf:knows <https://example.com/social/Bob>,
+        <https://example.com/social/Charles> ;
+    foaf:name "Alice Smith" .
+
+<https://example.com/social/Bob> a foaf:Person ;
+    ns1:spouse <https://example.com/social/Bob> ;
+    foaf:knows <https://example.com/social/Alice>,
+        <https://example.com/social/Charles> ;
+    foaf:name "Bob Smith" .
+

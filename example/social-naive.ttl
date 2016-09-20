@@ -1,0 +1,27 @@
+@prefix : <http://example.com/ns/> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xml: <http://www.w3.org/XML/1998/namespace> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<https://example.com/social/0> :DOB "1/12/1983" ;
+    :ID "Alice" ;
+    :Knows "Bob; Charles" ;
+    :MarriedTo "Bob" ;
+    :Name "Alice Smith" .
+
+<https://example.com/social/1> :DOB "3/23/1985" ;
+    :ID "Bob" ;
+    :Knows "Alice; Charles" ;
+    :MarriedTo "Alice" ;
+    :Name "Bob Smith" .
+
+<https://example.com/social/2> :DOB "12/15/1955" ;
+    :ID "Charles" ;
+    :Knows "Alice; Bob" ;
+    :Name "Charles Brown" .
+
+<https://example.com/social/3> :DOB "4/25/1967" ;
+    :ID "Dave" ;
+    :Name "Dave Jones" .
+
