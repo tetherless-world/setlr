@@ -28,6 +28,7 @@ setup(
         'beautifulsoup4',
         'jinja2',
         'requests-testadapter',
+        'python-slugify',
     ],
     entry_points = {
         'console_scripts': ['setlr=setlr:main'],

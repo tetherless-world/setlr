@@ -18,6 +18,7 @@ import uuid
 import tempfile
 
 import hashlib
+from slugify import slugify
 
 def hash(value):
     m = hashlib.sha256()
@@ -87,8 +88,8 @@ _rdf_formats_to_guess = [
     
 def read_graph(location, result, g = None):
     if g is None:
-        g = Dataset(default_union=True)
-    graph = g.graph(result.identifier)
+        g = ConjunctiveGraph()
+    graph = ConjunctiveGraph(store=g.store, identifier=result.identifier)
     if len(graph) == 0:
         data = get_content(location).read()
         f = guess_format(location)
@@ -254,7 +255,11 @@ def json_transform(transform, resources):
              "transform": transform,
              "setl_graph": transform.graph,
              "isempty":isempty,
-             "hash":hash
+             "slugify" : slugify,
+             "hash":hash,
+             "isinstance":isinstance,
+             "str":str,
+             "list":list
         }
         e.update(variables)
         e.update(rdflib.__dict__)
@@ -274,10 +279,19 @@ def json_transform(transform, resources):
                         incl = eval(value['@if'], globals(), env)
                         if not incl:
                             continue
+                    except KeyError:
+                        continue
+                    except AttributeError:
+                        continue
+                    except TypeError:
+                        continue
                     except Exception as e:
                         trace = sys.exc_info()[2]
                         print "Error in conditional", value['@if']
-                        print "Locals:", env.keys()
+                        print "Relevant Environment:"
+                        for key, v in env.items():
+                            if key in value['@if']:
+                                print key + "\t" + str(v)[:1000]
                         raise e, None, trace
                 if '@for' in value:
                     f = value['@for']
@@ -327,6 +341,10 @@ def json_transform(transform, resources):
                 except Exception as e:
                     trace = sys.exc_info()[2]
                     print "Error in template", value, type(value)
+                    print "Relevant Environment:"
+                    for key, v in env.items():
+                        if key in value:
+                            print key + "\t" + str(v)[:1000]
                     raise e, None, trace
             else:
                 this = value
@@ -391,11 +409,13 @@ def json_transform(transform, resources):
 
             except Exception as e:
                 trace = sys.exc_info()[2]
-                print "Error on", rowname, row
+                if (len(row) > 100):
+                    print "Error on", rowname
+                else:
+                    print "Error on", rowname, row
                 raise e, None, trace
         print ""
     resources[generated.identifier] = result
-    
     
             
 def transform(transform_resource, resources):
@@ -448,16 +468,19 @@ def transform(transform_resource, resources):
         
 def load(load_resource, resources):
     print 'Loading',load_resource.identifier
-    file_graph = ConjunctiveGraph(store='Sleepycat')
+    file_graph = Dataset(store='Sleepycat', default_union=True)
     tempdir = tempfile.mkdtemp()
     print "Gathering", load_resource.identifier, "into", tempdir
     file_graph.store.open(tempdir, True)
-    for used in load_resource[prov.used]:
-        print "Using",used.identifier
-        used_graph = resources[used.identifier]
-        file_graph.namespace_manager = used_graph.namespace_manager
-        #print used_graph.serialize(format="trig")
-        file_graph += used_graph
+    if len(list(load_resource[prov.used])) == 1:
+        file_graph = resources[load_resource.value(prov.used).identifier]
+    else:
+        for used in load_resource[prov.used]:
+            print "Using",used.identifier
+            used_graph = resources[used.identifier]
+            file_graph.namespace_manager = used_graph.namespace_manager
+            #print used_graph.serialize(format="trig")
+            file_graph.addN(used_graph.quads())
 
     for generated in load_resource.subjects(prov.wasGeneratedBy):
         # TODO: support LDP-based loading
@@ -475,8 +498,8 @@ def load(load_resource, resources):
             from rdflib.plugins.stores.sparqlstore import SPARQLUpdateStore
             endpoint = generated.value(sd.endpoint, default=generated).identifier
             store = SPARQLUpdateStore(endpoint, endpoint, autocommit=False)
-            endpoint_graph = ConjunctiveGraph(store=store, identifier=generated.identifier)
-            endpoint_graph += file_graph
+            endpoint_graph = Dataset(store=store, identifier=generated.identifier, default_union=True)
+            endpoint_graph.addN(file_graph.quads())
             endpoint_graph.commit()
     
         
