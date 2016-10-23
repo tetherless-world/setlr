@@ -16,6 +16,9 @@ from StringIO import StringIO
 from numpy import isnan
 import uuid
 import tempfile
+import ijson
+
+from itertools import chain
 
 import hashlib
 from slugify import slugify
@@ -34,6 +37,7 @@ sp = Namespace('http://spinrdf.org/sp#')
 sd = Namespace('http://www.w3.org/ns/sparql-service-description#')
 dc = Namespace('http://purl.org/dc/terms/')
 void = Namespace('http://rdfs.org/ns/void#')
+api_vocab = Namespace('http://purl.org/linked-data/api/vocab#')
 
 sys.setrecursionlimit(10000)
 
@@ -113,7 +117,8 @@ def get_content(location):
     if location.startswith("file://"):
         return open(location[7:],'rb')
     else:
-        return StringIO(requests.get(location).content)
+        return requests.get(location,stream=True).raw
+        #return StringIO(requests.get(location).content)
 
 extractors = {
     setl.XPORT : lambda location, result: pandas.read_sas(get_content(location), format='xport'),
@@ -121,8 +126,8 @@ extractors = {
     csvw.Table : read_csv,
     OWL.Ontology : read_graph,
     void.Dataset : read_graph,
-    setl.JSON : lambda location, result: json.load(get_content(location)),
-    setl.XML : lambda location, result: ET.fromstring(get_content(location).read())
+    setl.JSON : lambda location, result: enumerate(ijson.items(get_content(location), result.value(api_vocab.selector,default=""))),
+    setl.XML : lambda location, result: enumerate(ET.fromstring(get_content(location).read().findall('.')))
 }
 
 try:
@@ -259,6 +264,7 @@ def json_transform(transform, resources):
              "hash":hash,
              "isinstance":isinstance,
              "str":str,
+             "chain": lambda x: chain(*x),
              "list":list
         }
         e.update(variables)
@@ -386,7 +392,7 @@ def json_transform(transform, resources):
         table = resources[t.identifier]
         if run_samples:
             table = table.head()
-        it = [(0, table)]
+        it = table
         if isinstance(table, pandas.DataFrame):
             it = table.iterrows()
             print "Transforming", len(table.index), "rows."
@@ -409,10 +415,10 @@ def json_transform(transform, resources):
 
             except Exception as e:
                 trace = sys.exc_info()[2]
-                if (len(row) > 100):
-                    print "Error on", rowname
-                else:
+                if isinstance(table, pandas.DataFrame):
                     print "Error on", rowname, row
+                else:
+                    print "Error on", rowname
                 raise e, None, trace
         print ""
     resources[generated.identifier] = result
