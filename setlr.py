@@ -17,6 +17,7 @@ from numpy import isnan
 import uuid
 import tempfile
 import ijson
+import xml.etree.ElementTree as ET
 
 from itertools import chain
 
@@ -71,6 +72,54 @@ datatypeConverters.update({
 
 run_samples = False
 
+_rdf_formats_to_guess = [
+    'xml',
+    'json-ld',
+    'trig',
+    'nquads',
+    'trix'
+]
+
+def lru(original_function, maxsize=1000):
+    mapping = {}
+
+    PREV, NEXT, KEY, VALUE = 0, 1, 2, 3         # link fields
+    head = [None, None, None, None]        # oldest
+    tail = [head, None, None, None]   # newest
+    head[NEXT] = tail
+
+    def fn(*args, **kw):
+        key = (args,tuple(kw.items()))
+        PREV, NEXT = 0, 1
+        #print "Cache lookup for "+str(key)
+        link = mapping.get(key, head)
+        if link is head:
+            #print "Cache miss for "+str(key)
+            value = original_function(*args,**kw)
+            if len(mapping) >= maxsize:
+                old_prev, old_next, old_key, old_value = head[NEXT]
+                head[NEXT] = old_next
+                old_next[PREV] = head
+                del mapping[old_key]
+            last = tail[PREV]
+            link = [last, tail, key, value]
+            mapping[key] = last[NEXT] = tail[PREV] = link
+        else:
+            #print "Cache hit for "+str(key)
+            link_prev, link_next, key, value = link
+            link_prev[NEXT] = link_next
+            link_next[PREV] = link_prev
+            last = tail[PREV]
+            last[NEXT] = tail[PREV] = link
+            link[PREV] = last
+            link[NEXT] = tail
+        return value
+    return fn
+
+@lru
+def _get(location):
+    return requests.get(location).content
+
 def read_csv(location, result):
     args = dict(
         sep = result.value(csvw.delimiter, default=Literal(",")).value,
@@ -79,17 +128,10 @@ def read_csv(location, result):
     )
     if result.value(csvw.header):
         args['header'] = [0]
-    df = pandas.read_csv(location,encoding='utf-8', **args)
+    print location
+    df = pandas.read_csv(StringIO(_get(location)),encoding='utf-8', **args)
     return df
-
-_rdf_formats_to_guess = [
-    'xml',
-    'json-ld',
-    'trig',
-    'nquads',
-    'trix'
-]
-    
+        
 def read_graph(location, result, g = None):
     if g is None:
         g = ConjunctiveGraph()
@@ -127,7 +169,7 @@ extractors = {
     OWL.Ontology : read_graph,
     void.Dataset : read_graph,
     setl.JSON : lambda location, result: enumerate(ijson.items(get_content(location), result.value(api_vocab.selector,default=""))),
-    setl.XML : lambda location, result: enumerate(ET.fromstring(get_content(location).read().findall('.')))
+    setl.XML : lambda location, result: enumerate(ET.fromstring(get_content(location).read()).findall('.'))
 }
 
 try:
@@ -221,7 +263,7 @@ def extract(e, resources):
         for t in result[RDF.type]:
             # Do we know how to generate this?
             if t.identifier in extractors:
-                print "Extracted", result.identifier
+                print "Extracted", used.identifier
                 resources[result.identifier] = extractors[t.identifier](used.identifier, result)
                 return
 
@@ -283,7 +325,7 @@ def json_transform(transform, resources):
                 if '@if' in value:
                     try:
                         incl = eval(value['@if'], globals(), env)
-                        if not incl:
+                        if incl is None or not incl:
                             continue
                     except KeyError:
                         continue
@@ -379,6 +421,8 @@ def json_transform(transform, resources):
         jslt = json.loads(s)
     except Exception as e:
         trace = sys.exc_info()[2]
+        if 'No JSON object could be decoded' in e.message:
+            print s
         if 'line' in e.message:
             line = int(re.search("line ([0-9]+)", e.message).group(1))
             print "Error in parsing JSON Template at line %d:" % line
@@ -390,10 +434,10 @@ def json_transform(transform, resources):
     for t in tables:
         print "Using", t.identifier
         table = resources[t.identifier]
-        if run_samples:
-            table = table.head()
         it = table
         if isinstance(table, pandas.DataFrame):
+            if run_samples:
+                table = table.head()
             it = table.iterrows()
             print "Transforming", len(table.index), "rows."
         else:
@@ -474,10 +518,16 @@ def transform(transform_resource, resources):
         
 def load(load_resource, resources):
     print 'Loading',load_resource.identifier
-    file_graph = Dataset(store='Sleepycat', default_union=True)
-    tempdir = tempfile.mkdtemp()
-    print "Gathering", load_resource.identifier, "into", tempdir
-    file_graph.store.open(tempdir, True)
+    file_graph = Dataset(default_union=True)
+    to_disk = False
+    for used in load_resource[prov.used]:
+        if used[RDF.type : setl.Persisted]:
+            to_disk = True
+            file_graph = Dataset(store='Sleepycat', default_union=True)
+            tempdir = tempfile.mkdtemp()
+            print "Gathering", load_resource.identifier, "into", tempdir
+            file_graph.store.open(tempdir, True)
+            break
     if len(list(load_resource[prov.used])) == 1:
         file_graph = resources[load_resource.value(prov.used).identifier]
     else:
@@ -507,6 +557,8 @@ def load(load_resource, resources):
             endpoint_graph = Dataset(store=store, identifier=generated.identifier, default_union=True)
             endpoint_graph.addN(file_graph.quads())
             endpoint_graph.commit()
+    if to_disk:
+        file_graph.close()
     
         
 actions = {
@@ -526,7 +578,7 @@ def _setl(setl_graph):
             action[0](task, resources)
     
     return resources
-    
+
 def main():
     global run_samples
     setl_file = sys.argv[1]
