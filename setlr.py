@@ -118,7 +118,10 @@ def lru(original_function, maxsize=1000):
 
 @lru
 def _get(location):
-    return requests.get(location).content
+    if location.startswith("file://"):
+        return open(location[7:],'rb').read()
+    else:
+        return requests.get(location).content
 
 def read_csv(location, result):
     args = dict(

@@ -10,7 +10,7 @@ def read(fname):
 
 setup(
     name = "setlr",
-    version = "0.1.4",
+    version = "0.1.5",
     author = "Jim McCusker",
     author_email = "mccusj@cs.rpi.edu",
     description = ("setlr is a tool for Semantic Extraction, Transformation, and Loading."),
@@ -28,6 +28,7 @@ setup(
         'toposort',
         'beautifulsoup4',
         'jinja2',
+        'ijson',
         'requests-testadapter',
         'python-slugify',
     ],
