@@ -28,6 +28,7 @@ setup(
         'toposort',
         'beautifulsoup4',
         'jinja2',
+        'lxml',
         'ijson',
         'requests-testadapter',
         'python-slugify',

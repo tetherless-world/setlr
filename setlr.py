@@ -17,7 +17,8 @@ from numpy import isnan
 import uuid
 import tempfile
 import ijson
-import xml.etree.ElementTree as ET
+import iterparse_filter
+#import xml.etree.ElementTree as ET
 
 from itertools import chain
 
@@ -43,6 +44,9 @@ api_vocab = Namespace('http://purl.org/linked-data/api/vocab#')
 sys.setrecursionlimit(10000)
 
 from requests_testadapter import Resp
+
+def camelcase(s):
+    return slugify(s).title().replace("-","")
 
 class LocalFileAdapter(requests.adapters.HTTPAdapter):
     def build_response_from_file(self, request):
@@ -131,8 +135,8 @@ def read_csv(location, result):
     )
     if result.value(csvw.header):
         args['header'] = [0]
-    print location
     df = pandas.read_csv(StringIO(_get(location)),encoding='utf-8', **args)
+    print "Loaded", location
     return df
         
 def read_graph(location, result, g = None):
@@ -165,14 +169,38 @@ def get_content(location):
         return requests.get(location,stream=True).raw
         #return StringIO(requests.get(location).content)
 
+def read_excel(location, result):
+    args = dict(
+        sheetname = result.value(setl.sheetname, default=Literal(0)).value,
+        header = result.value(csvw.headerRow, default=Literal(0)).value,
+        skiprows = result.value(csvw.skipRows, default=Literal(0)).value
+    )
+    if result.value(csvw.header):
+        args['header'] = [result.value(csvw.header).value]
+    df = pandas.read_excel(StringIO(_get(location)),encoding='utf-8', **args)
+    return df
+
+def read_xml(location, result):
+    validate_dtd = False
+    if result[RDF.type:setl.DTDValidatedXML]:
+        validate_dtd = True
+    f = iterparse_filter.IterParseFilter()
+    if result.value(setl.xpath) is None:
+        f.iter_end("/*")
+    for xp in result[setl.xpath]:
+        f.iter_end(xp.value)
+    for (i,(event, ele)) in enumerate(f.iterparse(get_content(location))):
+        yield i, ele
+        
 extractors = {
     setl.XPORT : lambda location, result: pandas.read_sas(get_content(location), format='xport'),
     setl.SAS7BDAT : lambda location, result: pandas.read_sas(get_content(location), format='sas7bdat'),
+    setl.Excel : read_excel,
     csvw.Table : read_csv,
     OWL.Ontology : read_graph,
     void.Dataset : read_graph,
     setl.JSON : lambda location, result: enumerate(ijson.items(get_content(location), result.value(api_vocab.selector,default=""))),
-    setl.XML : lambda location, result: enumerate(ET.fromstring(get_content(location).read()).findall('.'))
+    setl.XML : read_xml 
 }
 
 try:
@@ -240,10 +268,20 @@ formats = {
     'application/json':'json-ld'
 }
 
+def create_python_function(f, resources):
+    local_vars = {'self' : f, 'resources': resources}
+    script = f.value(prov.value)
+    for qd in f[prov.qualifiedDerivation]:
+        entity = resources[qd.value(prov.entity).identifier]
+        name = qd.value(prov.hadRole).value(dc.identifier)
+        local_vars[name.value] = entity
+    exec(script.value, local_vars, globals())
+    resources[f.identifier] = local_vars['self']
+        
 def get_order(setl_graph):
     nodes = collections.defaultdict(set)
 
-    for typ in [setl.Extract, setl.Transform, setl.Load]:
+    for typ in actions:
         for task in setl_graph.subjects(RDF.type, typ):
             task = setl_graph.resource(task)
             for used in task[prov.used]:
@@ -254,6 +292,9 @@ def get_order(setl_graph):
                 nodes[task.identifier].add(used.identifier)
             for generated in task.subjects(prov.wasGeneratedBy):
                 nodes[generated.identifier].add(task.identifier)
+            for derivation in task[prov.qualifiedDerivation]:
+                derived = derivation.value(prov.entity)
+                nodes[task.identifier].add(used.identifier)
     
     return toposort_flatten(nodes)
 
@@ -306,6 +347,7 @@ def json_transform(transform, resources):
              "setl_graph": transform.graph,
              "isempty":isempty,
              "slugify" : slugify,
+             "camelcase" : camelcase,
              "hash":hash,
              "isinstance":isinstance,
              "str":str,
@@ -568,6 +610,7 @@ actions = {
     setl.Extract : extract,
     setl.Transform : json_transform,
     setl.Load : load,
+    setl.PythonScript : create_python_function
 }
             
 def _setl(setl_graph):
@@ -579,7 +622,7 @@ def _setl(setl_graph):
         action = [actions[t.identifier] for t in task[RDF.type] if t.identifier in actions]
         if len(action) > 0:
             action[0](task, resources)
-    
+        
     return resources
 
 def main():
