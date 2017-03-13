@@ -29,6 +29,7 @@ setup(
         'beautifulsoup4',
         'jinja2',
         'lxml',
+        'xlrd',
         'ijson',
         'requests-testadapter',
         'python-slugify',

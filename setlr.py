@@ -131,7 +131,8 @@ def read_csv(location, result):
     args = dict(
         sep = result.value(csvw.delimiter, default=Literal(",")).value,
         #header = result.value(csvw.headerRow, default=Literal(0)).value),
-        skiprows = result.value(csvw.skipRows, default=Literal(0)).value
+        skiprows = result.value(csvw.skipRows, default=Literal(0)).value,
+        dtype = object
     )
     if result.value(csvw.header):
         args['header'] = [0]
@@ -269,14 +270,15 @@ formats = {
 }
 
 def create_python_function(f, resources):
-    local_vars = {'self' : f, 'resources': resources}
+    global_vars = {'this' : f, 'resources': resources}
+    local_vars = {}
     script = f.value(prov.value)
     for qd in f[prov.qualifiedDerivation]:
         entity = resources[qd.value(prov.entity).identifier]
         name = qd.value(prov.hadRole).value(dc.identifier)
         local_vars[name.value] = entity
-    exec(script.value, local_vars, globals())
-    resources[f.identifier] = local_vars['self']
+    exec(script.value, local_vars, global_vars)
+    resources[f.identifier] = global_vars['result']
         
 def get_order(setl_graph):
     nodes = collections.defaultdict(set)
@@ -294,7 +296,7 @@ def get_order(setl_graph):
                 nodes[generated.identifier].add(task.identifier)
             for derivation in task[prov.qualifiedDerivation]:
                 derived = derivation.value(prov.entity)
-                nodes[task.identifier].add(used.identifier)
+                nodes[task.identifier].add(derived.identifier)
     
     return toposort_flatten(nodes)
 
@@ -309,7 +311,7 @@ def extract(e, resources):
             if t.identifier in extractors:
                 print "Extracted", used.identifier
                 resources[result.identifier] = extractors[t.identifier](used.identifier, result)
-                return
+                return resources[result.identifier]
 
 def isempty(value):
     try:
@@ -335,6 +337,7 @@ def json_transform(transform, resources):
         role = usage.value(prov.hadRole)
         roleID  = role.value(dc.identifier)
         variables[roleID.value] = resources[used.identifier]
+        print "Using", used.identifier, "as", roleID.value
 
     def process_row(row, template, rowname, table, resources):
         result = []
@@ -615,6 +618,7 @@ actions = {
             
 def _setl(setl_graph):
     resources = {}
+    resources.update(actions)
 
     tasks = [setl_graph.resource(t) for t in get_order(setl_graph)]
 
