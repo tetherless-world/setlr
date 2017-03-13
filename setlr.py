@@ -184,7 +184,7 @@ def read_xml(location, result):
     validate_dtd = False
     if result[RDF.type:setl.DTDValidatedXML]:
         validate_dtd = True
-    f = iterparse_filter.IterParseFilter()
+    f = iterparse_filter.IterParseFilter(validate_dtd=validate_dtd)
     if result.value(setl.xpath) is None:
         f.iter_end("/*")
     for xp in result[setl.xpath]:

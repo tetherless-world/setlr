@@ -183,11 +183,12 @@ def to_regexp(s, namespaces={}, default_namespace=None):
     return "".join(re_terms)
 
 class IterParseFilter(object):
-    def __init__(self, namespaces=None, default_namespace=None):
+    def __init__(self, namespaces=None, default_namespace=None, validate_dtd=False):
         if namespaces is None:
             namespaces = {}
         self.namespaces = namespaces
         self.default_namespace = default_namespace
+        self.validate_dtd = validate_dtd
 
         self._start_document_handlers = []
         self._end_document_handlers = []
@@ -267,11 +268,11 @@ class IterParseFilter(object):
 
     # These forward to the underlying automata; make a new one each time.
     def parse(self, file, state=None):
-        return self.create_fa().parse(file, state)
+        return self.create_fa().parse(file, state, self.validate_dtd)
 
     # Experimental
     def iterparse(self, file):
-        return self.create_fa().iterparse(file)
+        return self.create_fa().iterparse(file, self.validate_dtd)
     # I need a better name
     def handler_parse(self, file, state=None):
         return self.create_fa().handler_parse(file, state)
@@ -372,8 +373,8 @@ class FilterAutomata(object):
         
     # I plan to implement 'iterparse' as a near copy of 'parse'
     # but without any references to callbacks
-    def iterparse(self, file):
-        return self.parse(file, None)
+    def iterparse(self, file, validate_dtd=False):
+        return self.parse(file, None, validate_dtd)
         
     def parse(self, file, state=None, validate_dtd=False):
         if not dtd_validation:
