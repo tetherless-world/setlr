@@ -167,9 +167,9 @@ def read_graph(location, result, g = None):
 def get_content(location):
     if location.startswith("file://"):
         if os.name == 'nt': # skip the initial 
-            return open(location.replace('file://',''),'rb')
-        else:
             return open(location.replace('file:///','').replace('file://',''),'rb')
+        else:
+            return open(location.replace('file://',''),'rb')
     else:
         return requests.get(location,stream=True).raw
         #return StringIO(requests.get(location).content)
