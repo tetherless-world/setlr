@@ -10,6 +10,7 @@ import sys, collections
 import requests
 import pandas
 import re
+import os
 from jinja2 import Template
 from toposort import toposort_flatten
 from StringIO import StringIO
@@ -165,7 +166,10 @@ def read_graph(location, result, g = None):
 
 def get_content(location):
     if location.startswith("file://"):
-        return open(location[7:],'rb')
+        if os.name == 'nt': # skip the initial 
+            return open(location.replace('file://',''),'rb')
+        else:
+            return open(location.replace('file:///','').replace('file://',''),'rb')
     else:
         return requests.get(location,stream=True).raw
         #return StringIO(requests.get(location).content)
