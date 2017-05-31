@@ -667,7 +667,7 @@ def _setl(setl_graph):
         
     return resources
 
-def main(args):
+def main(*args):
     global run_samples
     setl_file = args[0]
     if 'sample' in args:
@@ -681,4 +681,4 @@ def main(args):
     return graphs
                 
 if __name__ == '__main__':
-    main(sys.argv[1:])
+    main(*sys.argv[1:])
