@@ -18,7 +18,7 @@ from numpy import isnan
 import uuid
 import tempfile
 import ijson
-import iterparse_filter
+from . import iterparse_filter
 #import xml.etree.ElementTree as ET
 
 from itertools import chain
@@ -177,7 +177,7 @@ def get_content(location):
 def read_excel(location, result):
     args = dict(
         sheetname = result.value(setl.sheetname, default=Literal(0)).value,
-        header = result.value(csvw.headerRow, default=Literal(0)).value,
+        header = result.value(csvw.headerRow, default=Literal(0)).value.split(','),
         skiprows = result.value(csvw.skipRows, default=Literal(0)).value
     )
     if result.value(csvw.header):
@@ -331,7 +331,7 @@ def clone(value):
         return dict(value)
     else:
         return value
-    
+
 def json_transform(transform, resources):
     print "Transforming", transform.identifier
     tables = [u for u in transform[prov.used]]
@@ -370,6 +370,8 @@ def json_transform(transform, resources):
             value = task
             this = None
             if isinstance(parent, dict):
+                if len(task) != 2:
+                    print task, parent
                 key, value = task
                 kt = Template(key)
                 key = kt.render(**env)
@@ -420,6 +422,35 @@ def json_transform(transform, resources):
                     except Exception as e:
                         trace = sys.exc_info()[2]
                         print "Error in for:", value['@for']
+                        print "Locals:", env.keys()
+                        raise e, None, trace
+                    continue
+                if '@with' in value:
+                    f = value['@with']
+                    if isinstance(f, list):
+                        f = ' '.join(f)
+                    expression, variable_list = f.split(" as ", 1)
+                    variable_list = re.split(',\s+', variable_list.strip())
+                    val = value
+                    if '@do' in value:
+                        val = value['@do']
+                    else:
+                        del val['@with']
+                    try:
+                        v = eval(expression, globals(), env)
+                        if v is not None:
+                            if len(variable_list) == 1:
+                                v = [v]
+                            new_env = dict(env)
+                            for i, variable in enumerate(variable_list):
+                                new_env[variable] = v[i]
+                            child = clone(val)
+                            todo.append((child, parent, new_env))
+                    except KeyError:
+                        pass
+                    except Exception as e:
+                        trace = sys.exc_info()[2]
+                        print "Error in with:", value['@with']
                         print "Locals:", env.keys()
                         raise e, None, trace
                     continue
@@ -488,13 +519,15 @@ def json_transform(transform, resources):
         table = resources[t.identifier]
         it = table
         if isinstance(table, pandas.DataFrame):
-            if run_samples:
-                table = table.head()
+            #if run_samples:
+            #    table = table.head()
             it = table.iterrows()
             print "Transforming", len(table.index), "rows."
         else:
             print "Transforming", t.identifier
         for rowname, row in it:
+            if run_samples and rowname >= 100:
+                break
             try:
                 root = {
                     "@id": generated.identifier,
@@ -617,7 +650,8 @@ actions = {
     setl.Extract : extract,
     setl.Transform : json_transform,
     setl.Load : load,
-    setl.PythonScript : create_python_function
+    setl.PythonScript : create_python_function,
+    setl.IsEmpty : isempty
 }
             
 def _setl(setl_graph):
@@ -633,10 +667,10 @@ def _setl(setl_graph):
         
     return resources
 
-def main():
+def main(args):
     global run_samples
-    setl_file = sys.argv[1]
-    if 'sample' in sys.argv:
+    setl_file = args[0]
+    if 'sample' in args:
         run_samples = True
         print "Only processing a few sample rows."
     setl_graph = ConjunctiveGraph()
@@ -644,6 +678,7 @@ def main():
     setl_graph.parse(data=content, format="turtle")
 
     graphs = _setl(setl_graph)
+    return graphs
                 
 if __name__ == '__main__':
-    main()
+    main(sys.argv[1:])

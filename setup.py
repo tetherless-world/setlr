@@ -10,17 +10,20 @@ def read(fname):
 
 setup(
     name = "setlr",
-    version = "0.1.5",
+    version = "0.1.7",
     author = "Jim McCusker",
     author_email = "mccusj@cs.rpi.edu",
     description = ("setlr is a tool for Semantic Extraction, Transformation, and Loading."),
     license = "Apache License 2.0",
     keywords = "rdf semantic etl",
     url = "http://packages.python.org/setlr",
-#    packages=['setlr'],
+    packages=['setlr'],
     long_description='''SETLr is a tool for generating RDF graphs, including named graphs, from almost any kind of tabular data.''',
     include_package_data = True,
     install_requires = [
+        'pip>=9.0.0',
+        'cython',
+        'numpy',
         'rdflib',
         'rdflib-jsonld',
         'pandas',
@@ -37,7 +40,6 @@ setup(
     entry_points = {
         'console_scripts': ['setlr=setlr:main'],
     },
-    packages = find_packages(),
     classifiers=[
         "Development Status :: 3 - Alpha",
         "Topic :: Utilities",
