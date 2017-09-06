@@ -20,6 +20,7 @@ import tempfile
 import ijson
 from . import iterparse_filter
 #import xml.etree.ElementTree as ET
+import xml.etree.ElementTree
 
 from itertools import chain
 
@@ -164,6 +165,26 @@ def read_graph(location, result, g = None):
                     read_graph(i.identifier, i, g = g)
     return g
 
+class FileLikeFromIter(object):
+    def __init__(self, content_iter):
+        self.iter = content_iter
+        self.data = ''
+
+    def __iter__(self):
+        return self.iter
+
+    def read(self, n=None):
+        if n is None:
+            return self.data + ''.join(l for l in self.iter)
+        else:
+            while len(self.data) < n:
+                try:
+                    self.data = ''.join((self.data, self.iter.next()))
+                except StopIteration:
+                    break
+            result, self.data = self.data[:n], self.data[n:]
+            return result
+
 def get_content(location):
     if location.startswith("file://"):
         if os.name == 'nt': # skip the initial 
@@ -171,13 +192,13 @@ def get_content(location):
         else:
             return open(location.replace('file://',''),'rb')
     else:
-        return requests.get(location,stream=True).raw
+        return FileLikeFromIter(requests.get(location,stream=True).iter_content())
         #return StringIO(requests.get(location).content)
 
 def read_excel(location, result):
     args = dict(
         sheetname = result.value(setl.sheetname, default=Literal(0)).value,
-        header = result.value(csvw.headerRow, default=Literal(0)).value.split(','),
+        header = [int(x) for x in result.value(csvw.headerRow, default=Literal('0')).value.split(',')],
         skiprows = result.value(csvw.skipRows, default=Literal(0)).value
     )
     if result.value(csvw.header):
@@ -196,7 +217,15 @@ def read_xml(location, result):
         f.iter_end(xp.value)
     for (i,(event, ele)) in enumerate(f.iterparse(get_content(location))):
         yield i, ele
-        
+
+def read_json(location, result):
+    selector = result.value(api_vocab.selector)
+    if selector is not None:
+        selector = selector.value
+    else:
+        selector = ""
+    return enumerate(ijson.items(get_content(location), selector))
+            
 extractors = {
     setl.XPORT : lambda location, result: pandas.read_sas(get_content(location), format='xport'),
     setl.SAS7BDAT : lambda location, result: pandas.read_sas(get_content(location), format='sas7bdat'),
@@ -204,14 +233,15 @@ extractors = {
     csvw.Table : read_csv,
     OWL.Ontology : read_graph,
     void.Dataset : read_graph,
-    setl.JSON : lambda location, result: enumerate(ijson.items(get_content(location), result.value(api_vocab.selector,default=""))),
+    setl.JSON : read_json,
     setl.XML : read_xml 
 }
 
+    
 try:
     from bs4 import BeautifulSoup
     extractors[setl.HTML] = lambda location, result: BeautifulSoup(get_content(location).read(), 'html.parser')
-except:
+except Exception as e:
     pass
     
     
@@ -341,7 +371,7 @@ def json_transform(transform, resources):
         role = usage.value(prov.hadRole)
         roleID  = role.value(dc.identifier)
         variables[roleID.value] = resources[used.identifier]
-        print "Using", used.identifier, "as", roleID.value
+        #print "Using", used.identifier, "as", roleID.value
 
     def process_row(row, template, rowname, table, resources):
         result = []
@@ -358,6 +388,8 @@ def json_transform(transform, resources):
              "hash":hash,
              "isinstance":isinstance,
              "str":str,
+             "float":float,
+             "int":int,
              "chain": lambda x: chain(*x),
              "list":list
         }
@@ -371,7 +403,7 @@ def json_transform(transform, resources):
             this = None
             if isinstance(parent, dict):
                 if len(task) != 2:
-                    print task, parent
+                    print task
                 key, value = task
                 kt = Template(key)
                 key = kt.render(**env)
@@ -393,6 +425,8 @@ def json_transform(transform, resources):
                         print "Relevant Environment:"
                         for key, v in env.items():
                             if key in value['@if']:
+                                if hasattr(v, 'findall'):
+                                    v = xml.etree.ElementTree.tostring(v)
                                 print key + "\t" + str(v)[:1000]
                         raise e, None, trace
                 if '@for' in value:
@@ -475,6 +509,8 @@ def json_transform(transform, resources):
                     print "Relevant Environment:"
                     for key, v in env.items():
                         if key in value:
+                            if hasattr(v, 'findall'):
+                                v = xml.etree.ElementTree.tostring(v)
                             print key + "\t" + str(v)[:1000]
                     raise e, None, trace
             else:
@@ -614,6 +650,7 @@ def load(load_resource, resources):
             file_graph.store.open(tempdir, True)
             break
     if len(list(load_resource[prov.used])) == 1:
+        print "Using",load_resource.value(prov.used).identifier
         file_graph = resources[load_resource.value(prov.used).identifier]
     else:
         for used in load_resource[prov.used]:
@@ -631,7 +668,7 @@ def load(load_resource, resources):
                 fmt = fmt.value
             if fmt in formats:
                 fmt = formats[fmt]
-                print fmt
+                #print fmt
             with open(generated.identifier.replace("file://",''), 'wb') as o:
                 o.write(file_graph.serialize(format=fmt))
                 o.close()
@@ -664,7 +701,6 @@ def _setl(setl_graph):
         action = [actions[t.identifier] for t in task[RDF.type] if t.identifier in actions]
         if len(action) > 0:
             action[0](task, resources)
-        
     return resources
 
 def main():
@@ -679,7 +715,9 @@ def main():
     setl_graph.parse(data=content, format="turtle")
 
     graphs = _setl(setl_graph)
-    return graphs
+#    print "Finished processing"
+#    return graphs
                 
 if __name__ == '__main__':
-    main()
+    result = main()
+    print "Exiting"
