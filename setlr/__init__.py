@@ -234,7 +234,8 @@ extractors = {
     OWL.Ontology : read_graph,
     void.Dataset : read_graph,
     setl.JSON : read_json,
-    setl.XML : read_xml 
+    setl.XML : read_xml,
+    URIRef("https://www.iana.org/assignments/media-types/text/plain") : lambda location, result: get_content(location)
 }
 
     
@@ -679,8 +680,8 @@ def load(load_resource, resources):
             endpoint_graph = Dataset(store=store, identifier=generated.identifier, default_union=True)
             endpoint_graph.addN(file_graph.quads())
             endpoint_graph.commit()
-    if to_disk:
-        file_graph.close()
+    #if to_disk:
+    #    file_graph.close()
     
         
 actions = {
