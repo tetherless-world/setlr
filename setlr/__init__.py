@@ -185,15 +185,24 @@ class FileLikeFromIter(object):
             result, self.data = self.data[:n], self.data[n:]
             return result
 
-def get_content(location):
+def _open_local_file(location):
     if location.startswith("file://"):
         if os.name == 'nt': # skip the initial 
             return open(location.replace('file:///','').replace('file://',''),'rb')
         else:
             return open(location.replace('file://',''),'rb')
-    else:
-        return FileLikeFromIter(requests.get(location,stream=True).iter_content())
-        #return StringIO(requests.get(location).content)
+
+content_handlers = [
+    _open_local_file,
+    lambda location: FileLikeFromIter(requests.get(location,stream=True).iter_content())
+]
+        
+def get_content(location):
+    for handler in content_handlers:
+        response = handler(location)
+        if response is not None:
+            return response
+    return
 
 def read_excel(location, result):
     args = dict(
