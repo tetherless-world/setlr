@@ -122,13 +122,6 @@ def lru(original_function, maxsize=1000):
         return value
     return fn
 
-@lru
-def _get(location):
-    if location.startswith("file://"):
-        return open(location[7:],'rb').read()
-    else:
-        return requests.get(location).content
-
 def read_csv(location, result):
     args = dict(
         sep = result.value(csvw.delimiter, default=Literal(",")).value,
@@ -138,7 +131,7 @@ def read_csv(location, result):
     )
     if result.value(csvw.header):
         args['header'] = [0]
-    df = pandas.read_csv(StringIO(_get(location)),encoding='utf-8', **args)
+    df = pandas.read_csv(get_content(location),encoding='utf-8', **args)
     print "Loaded", location
     return df
         
@@ -212,7 +205,7 @@ def read_excel(location, result):
     )
     if result.value(csvw.header):
         args['header'] = [result.value(csvw.header).value]
-    df = pandas.read_excel(StringIO(_get(location)),encoding='utf-8', **args)
+    df = pandas.read_excel(get_content(location),encoding='utf-8', **args)
     return df
 
 def read_xml(location, result):
