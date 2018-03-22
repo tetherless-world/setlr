@@ -24,6 +24,9 @@ import xml.etree.ElementTree
 
 from itertools import chain
 
+import zipfile
+import gzip
+
 import hashlib
 from slugify import slugify
 
@@ -131,7 +134,7 @@ def read_csv(location, result):
     )
     if result.value(csvw.header):
         args['header'] = [0]
-    df = pandas.read_csv(get_content(location),encoding='utf-8', **args)
+    df = pandas.read_csv(get_content(location, result),encoding='utf-8', **args)
     print "Loaded", location
     return df
         
@@ -140,7 +143,7 @@ def read_graph(location, result, g = None):
         g = ConjunctiveGraph()
     graph = ConjunctiveGraph(store=g.store, identifier=result.identifier)
     if len(graph) == 0:
-        data = get_content(location).read()
+        data = get_content(location, result).read()
         f = guess_format(location)
         for fmt in [f] + _rdf_formats_to_guess:
             try:
@@ -187,15 +190,46 @@ def _open_local_file(location):
 
 content_handlers = [
     _open_local_file,
-    lambda location: FileLikeFromIter(requests.get(location,stream=True).iter_content())
+    lambda location: FileLikeFromIter(requests.get(location,stream=True).iter_content(1024*1024))
 ]
         
-def get_content(location):
+def get_content(location, result):
+    response = None
     for handler in content_handlers:
         response = handler(location)
         if response is not None:
-            return response
-    return
+            break
+    if result[RDF.type:setl.Tempfile]:
+        result = to_tempfile(response)
+        
+    for t in result[RDF.type]:
+        # Do we know how to unpack this?
+        if t.identifier in unpackers:
+            response = unpackers[t.identifier](response)
+    return response
+
+def to_tempfile(f):
+    tf = tempfile.TemporaryFile()
+    print "Writing to disk"
+    for chunk in f:
+        if chunk: # filter out keep-alive new chunks
+            tf.write(chunk)
+            sys.stdout.write(".")
+            sys.stdout.flush()
+    tf.seek(0)
+    print "done."
+    return tf
+
+def unpack_zipfile(f):
+    zf = zipfile.ZipFile(f, mode='r')
+    files = zf.infolist()
+    return zf.open(files[0])
+
+unpackers = {
+#    setl.Tempfile : lambda x: x,
+    setl.ZipFile : lambda x: unpack_zipfile(to_tempfile(x)),
+    setl.GZipFile : lambda f: gzip.GzipFile(fileobj=f,mode='r')
+}
 
 def read_excel(location, result):
     args = dict(
@@ -205,7 +239,7 @@ def read_excel(location, result):
     )
     if result.value(csvw.header):
         args['header'] = [result.value(csvw.header).value]
-    df = pandas.read_excel(get_content(location),encoding='utf-8', **args)
+    df = pandas.read_excel(get_content(location, result),encoding='utf-8', **args)
     return df
 
 def read_xml(location, result):
@@ -214,10 +248,11 @@ def read_xml(location, result):
         validate_dtd = True
     f = iterparse_filter.IterParseFilter(validate_dtd=validate_dtd)
     if result.value(setl.xpath) is None:
+        print "no xpath to select on!"
         f.iter_end("/*")
     for xp in result[setl.xpath]:
         f.iter_end(xp.value)
-    for (i,(event, ele)) in enumerate(f.iterparse(get_content(location))):
+    for (i,(event, ele)) in enumerate(f.iterparse(get_content(location, result))):
         yield i, ele
 
 def read_json(location, result):
@@ -226,24 +261,25 @@ def read_json(location, result):
         selector = selector.value
     else:
         selector = ""
-    return enumerate(ijson.items(get_content(location), selector))
+    return enumerate(ijson.items(get_content(location, result), selector))
             
+
 extractors = {
-    setl.XPORT : lambda location, result: pandas.read_sas(get_content(location), format='xport'),
-    setl.SAS7BDAT : lambda location, result: pandas.read_sas(get_content(location), format='sas7bdat'),
+    setl.XPORT : lambda location, result: pandas.read_sas(get_content(location, result), format='xport'),
+    setl.SAS7BDAT : lambda location, result: pandas.read_sas(get_content(location, result), format='sas7bdat'),
     setl.Excel : read_excel,
     csvw.Table : read_csv,
     OWL.Ontology : read_graph,
     void.Dataset : read_graph,
     setl.JSON : read_json,
     setl.XML : read_xml,
-    URIRef("https://www.iana.org/assignments/media-types/text/plain") : lambda location, result: get_content(location)
+    URIRef("https://www.iana.org/assignments/media-types/text/plain") : lambda location, result: get_content(location, result)
 }
 
     
 try:
     from bs4 import BeautifulSoup
-    extractors[setl.HTML] = lambda location, result: BeautifulSoup(get_content(location).read(), 'html.parser')
+    extractors[setl.HTML] = lambda location, result: BeautifulSoup(get_content(location, result).read(), 'html.parser')
 except Exception as e:
     pass
     
@@ -375,7 +411,23 @@ def json_transform(transform, resources):
         roleID  = role.value(dc.identifier)
         variables[roleID.value] = resources[used.identifier]
         #print "Using", used.identifier, "as", roleID.value
+    functions = {}
+    def get_function(expr, local_keys):
+        key = tuple([expr]+sorted(local_keys))
+        if key not in functions:
+            script = '''lambda %s: %s'''% (', '.join(sorted(local_keys)), expr)
+            fn = eval(script)
+            fn.__name__ = str(expr)
+            functions[key] = fn
+        return functions[key]
 
+    templates = {}
+    def get_template(templ):
+        if templ not in templates:
+            t = Template(templ)
+            templates[templ] = t
+        return templates[templ]
+    
     def process_row(row, template, rowname, table, resources):
         result = []
         e = {'row':row,
@@ -399,6 +451,7 @@ def json_transform(transform, resources):
         e.update(variables)
         e.update(rdflib.__dict__)
         todo = [[x, result, e] for x in template]
+
         while len(todo) > 0:
             task, parent, env = todo.pop()
             key = None
@@ -408,12 +461,13 @@ def json_transform(transform, resources):
                 if len(task) != 2:
                     print task
                 key, value = task
-                kt = Template(key)
+                kt = get_template(key)
                 key = kt.render(**env)
             if isinstance(value, dict):
                 if '@if' in value:
                     try:
-                        incl = eval(value['@if'], globals(), env)
+                        fn = get_function(value['@if'], env.keys())
+                        incl = fn(**env)
                         if incl is None or not incl:
                             continue
                     except KeyError:
@@ -444,7 +498,8 @@ def json_transform(transform, resources):
                     else:
                         del val['@for']
                     try:
-                        values = eval(expression, globals(), env)
+                        fn = get_function(expression, env.keys())
+                        values = fn(**env)
                         if values is not None:
                             for v in values:
                                 if len(variable_list) == 1:
@@ -474,7 +529,8 @@ def json_transform(transform, resources):
                     else:
                         del val['@with']
                     try:
-                        v = eval(expression, globals(), env)
+                        fn = get_function(expression, env.keys())
+                        v = fn(**env)
                         if v is not None:
                             if len(variable_list) == 1:
                                 v = [v]
@@ -504,7 +560,7 @@ def json_transform(transform, resources):
                     todo.append((child, this, env))
             elif isinstance(value, unicode):
                 try:
-                    template = Template(unicode(value))
+                    template = get_template(unicode(value))
                     this = template.render(**env)
                 except Exception as e:
                     trace = sys.exc_info()[2]
@@ -574,11 +630,13 @@ def json_transform(transform, resources):
                 }
                 if context is not None:
                     root['@context'] = context
+                before = len(result)
                 #graph = ConjunctiveGraph(identifier=generated.identifier)
                 #graph.parse(data=json.dumps(root),format="json-ld")
                 result.parse(data=json.dumps(root), format="json-ld")
+                after = len(result)
                 sys.stdout.write('\r')
-                sys.stdout.write("Row "+str(rowname))
+                sys.stdout.write("Row "+str(rowname)+" added "+str(after-before)+" triples.")
                 sys.stdout.flush()
 
             except Exception as e:
@@ -589,6 +647,9 @@ def json_transform(transform, resources):
                     print "Error on", rowname
                 raise e, None, trace
         print ""
+        if len(result) == 0:
+            print "This isn't parsing as RDF:"
+            print json.dumps(root)
     resources[generated.identifier] = result
     
             
