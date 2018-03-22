@@ -252,9 +252,6 @@ def read_xml(location, result):
         f.iter_end("/*")
     for xp in result[setl.xpath]:
         f.iter_end(xp.value)
-    iterator = iter()
-    memory_use = 0
-    iterations = 0
     for (i, (event, ele)) in enumerate(f.iterparse(get_content(location, result))):
         yield i, ele
 
