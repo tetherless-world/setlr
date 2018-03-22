@@ -252,9 +252,13 @@ def read_xml(location, result):
         f.iter_end("/*")
     for xp in result[setl.xpath]:
         f.iter_end(xp.value)
-    for (i,(event, ele)) in enumerate(f.iterparse(get_content(location, result))):
+    iterator = iter()
+    memory_use = 0
+    iterations = 0
+    for (i, (event, ele)) in enumerate(f.iterparse(get_content(location, result))):
         yield i, ele
 
+             
 def read_json(location, result):
     selector = result.value(api_vocab.selector)
     if selector is not None:
@@ -401,6 +405,176 @@ def clone(value):
     else:
         return value
 
+functions = {}
+def get_function(expr, local_keys):
+    key = tuple([expr]+sorted(local_keys))
+    if key not in functions:
+        script = '''lambda %s: %s'''% (', '.join(sorted(local_keys)), expr)
+        fn = eval(script)
+        fn.__name__ = str(expr)
+        functions[key] = fn
+    return functions[key]
+
+templates = {}
+def get_template(templ):
+    if templ not in templates:
+        t = Template(templ)
+        templates[templ] = t
+    return templates[templ]
+    
+def process_row(row, template, rowname, table, resources, transform, variables):
+    result = []
+    e = {'row':row,
+         'name': rowname,
+         'table': table,
+         'resources': resources,
+         'template': template,
+         "transform": transform,
+         "setl_graph": transform.graph,
+         "isempty":isempty,
+         "slugify" : slugify,
+         "camelcase" : camelcase,
+         "hash":hash,
+         "isinstance":isinstance,
+         "str":str,
+         "float":float,
+         "int":int,
+         "chain": lambda x: chain(*x),
+         "list":list
+    }
+    e.update(variables)
+    e.update(rdflib.__dict__)
+    todo = [[x, result, e] for x in template]
+
+    while len(todo) > 0:
+        task, parent, env = todo.pop()
+        key = None
+        value = task
+        this = None
+        if isinstance(parent, dict):
+            if len(task) != 2:
+                print task
+            key, value = task
+            kt = get_template(key)
+            key = kt.render(**env)
+        if isinstance(value, dict):
+            if '@if' in value:
+                try:
+                    fn = get_function(value['@if'], env.keys())
+                    incl = fn(**env)
+                    if incl is None or not incl:
+                        continue
+                except KeyError:
+                    continue
+                except AttributeError:
+                    continue
+                except TypeError:
+                    continue
+                except Exception as e:
+                    trace = sys.exc_info()[2]
+                    print "Error in conditional", value['@if']
+                    print "Relevant Environment:"
+                    for key, v in env.items():
+                        if key in value['@if']:
+                            if hasattr(v, 'findall'):
+                                v = xml.etree.ElementTree.tostring(v)
+                            print key + "\t" + str(v)[:1000]
+                    raise e, None, trace
+            if '@for' in value:
+                f = value['@for']
+                if isinstance(f, list):
+                    f = ' '.join(f)
+                variable_list, expression = f.split(" in ", 1)
+                variable_list = re.split(',\s+', variable_list.strip())
+                val = value
+                if '@do' in value:
+                    val = value['@do']
+                else:
+                    del val['@for']
+                try:
+                    fn = get_function(expression, env.keys())
+                    values = fn(**env)
+                    if values is not None:
+                        for v in values:
+                            if len(variable_list) == 1:
+                                v = [v]
+                            new_env = dict(env)
+                            for i, variable in enumerate(variable_list):
+                                new_env[variable] = v[i]
+                            child = clone(val)
+                            todo.append((child, parent, new_env))
+                except KeyError:
+                    pass
+                except Exception as e:
+                    trace = sys.exc_info()[2]
+                    print "Error in for:", value['@for']
+                    print "Locals:", env.keys()
+                    raise e, None, trace
+                continue
+            if '@with' in value:
+                f = value['@with']
+                if isinstance(f, list):
+                    f = ' '.join(f)
+                expression, variable_list = f.split(" as ", 1)
+                variable_list = re.split(',\s+', variable_list.strip())
+                val = value
+                if '@do' in value:
+                    val = value['@do']
+                else:
+                    del val['@with']
+                try:
+                    fn = get_function(expression, env.keys())
+                    v = fn(**env)
+                    if v is not None:
+                        if len(variable_list) == 1:
+                            v = [v]
+                        new_env = dict(env)
+                        for i, variable in enumerate(variable_list):
+                            new_env[variable] = v[i]
+                        child = clone(val)
+                        todo.append((child, parent, new_env))
+                except KeyError:
+                    pass
+                except Exception as e:
+                    trace = sys.exc_info()[2]
+                    print "Error in with:", value['@with']
+                    print "Locals:", env.keys()
+                    raise e, None, trace
+                continue
+            this = {}
+            for child in value.items():
+                if child[0] == '@if':
+                    continue
+                if child[0] == '@for':
+                    continue
+                todo.append((child, this, env))
+        elif isinstance(value, list):
+            this = []
+            for child in value:
+                todo.append((child, this, env))
+        elif isinstance(value, unicode):
+            try:
+                template = get_template(unicode(value))
+                this = template.render(**env)
+            except Exception as e:
+                trace = sys.exc_info()[2]
+                print "Error in template", value, type(value)
+                print "Relevant Environment:"
+                for key, v in env.items():
+                    if key in value:
+                        if hasattr(v, 'findall'):
+                            v = xml.etree.ElementTree.tostring(v)
+                        print key + "\t" + str(v)[:1000]
+                raise e, None, trace
+        else:
+            this = value
+
+        if key is not None:
+            parent[key] = this
+        else:
+            parent.append(this)
+    return result
+
 def json_transform(transform, resources):
     print "Transforming", transform.identifier
     tables = [u for u in transform[prov.used]]
@@ -411,175 +585,6 @@ def json_transform(transform, resources):
         roleID  = role.value(dc.identifier)
         variables[roleID.value] = resources[used.identifier]
         #print "Using", used.identifier, "as", roleID.value
-    functions = {}
-    def get_function(expr, local_keys):
-        key = tuple([expr]+sorted(local_keys))
-        if key not in functions:
-            script = '''lambda %s: %s'''% (', '.join(sorted(local_keys)), expr)
-            fn = eval(script)
-            fn.__name__ = str(expr)
-            functions[key] = fn
-        return functions[key]
-
-    templates = {}
-    def get_template(templ):
-        if templ not in templates:
-            t = Template(templ)
-            templates[templ] = t
-        return templates[templ]
-    
-    def process_row(row, template, rowname, table, resources):
-        result = []
-        e = {'row':row,
-             'name': rowname,
-             'table': table,
-             'resources': resources,
-             'template': template,
-             "transform": transform,
-             "setl_graph": transform.graph,
-             "isempty":isempty,
-             "slugify" : slugify,
-             "camelcase" : camelcase,
-             "hash":hash,
-             "isinstance":isinstance,
-             "str":str,
-             "float":float,
-             "int":int,
-             "chain": lambda x: chain(*x),
-             "list":list
-        }
-        e.update(variables)
-        e.update(rdflib.__dict__)
-        todo = [[x, result, e] for x in template]
-
-        while len(todo) > 0:
-            task, parent, env = todo.pop()
-            key = None
-            value = task
-            this = None
-            if isinstance(parent, dict):
-                if len(task) != 2:
-                    print task
-                key, value = task
-                kt = get_template(key)
-                key = kt.render(**env)
-            if isinstance(value, dict):
-                if '@if' in value:
-                    try:
-                        fn = get_function(value['@if'], env.keys())
-                        incl = fn(**env)
-                        if incl is None or not incl:
-                            continue
-                    except KeyError:
-                        continue
-                    except AttributeError:
-                        continue
-                    except TypeError:
-                        continue
-                    except Exception as e:
-                        trace = sys.exc_info()[2]
-                        print "Error in conditional", value['@if']
-                        print "Relevant Environment:"
-                        for key, v in env.items():
-                            if key in value['@if']:
-                                if hasattr(v, 'findall'):
-                                    v = xml.etree.ElementTree.tostring(v)
-                                print key + "\t" + str(v)[:1000]
-                        raise e, None, trace
-                if '@for' in value:
-                    f = value['@for']
-                    if isinstance(f, list):
-                        f = ' '.join(f)
-                    variable_list, expression = f.split(" in ", 1)
-                    variable_list = re.split(',\s+', variable_list.strip())
-                    val = value
-                    if '@do' in value:
-                        val = value['@do']
-                    else:
-                        del val['@for']
-                    try:
-                        fn = get_function(expression, env.keys())
-                        values = fn(**env)
-                        if values is not None:
-                            for v in values:
-                                if len(variable_list) == 1:
-                                    v = [v]
-                                new_env = dict(env)
-                                for i, variable in enumerate(variable_list):
-                                    new_env[variable] = v[i]
-                                child = clone(val)
-                                todo.append((child, parent, new_env))
-                    except KeyError:
-                        pass
-                    except Exception as e:
-                        trace = sys.exc_info()[2]
-                        print "Error in for:", value['@for']
-                        print "Locals:", env.keys()
-                        raise e, None, trace
-                    continue
-                if '@with' in value:
-                    f = value['@with']
-                    if isinstance(f, list):
-                        f = ' '.join(f)
-                    expression, variable_list = f.split(" as ", 1)
-                    variable_list = re.split(',\s+', variable_list.strip())
-                    val = value
-                    if '@do' in value:
-                        val = value['@do']
-                    else:
-                        del val['@with']
-                    try:
-                        fn = get_function(expression, env.keys())
-                        v = fn(**env)
-                        if v is not None:
-                            if len(variable_list) == 1:
-                                v = [v]
-                            new_env = dict(env)
-                            for i, variable in enumerate(variable_list):
-                                new_env[variable] = v[i]
-                            child = clone(val)
-                            todo.append((child, parent, new_env))
-                    except KeyError:
-                        pass
-                    except Exception as e:
-                        trace = sys.exc_info()[2]
-                        print "Error in with:", value['@with']
-                        print "Locals:", env.keys()
-                        raise e, None, trace
-                    continue
-                this = {}
-                for child in value.items():
-                    if child[0] == '@if':
-                        continue
-                    if child[0] == '@for':
-                        continue
-                    todo.append((child, this, env))
-            elif isinstance(value, list):
-                this = []
-                for child in value:
-                    todo.append((child, this, env))
-            elif isinstance(value, unicode):
-                try:
-                    template = get_template(unicode(value))
-                    this = template.render(**env)
-                except Exception as e:
-                    trace = sys.exc_info()[2]
-                    print "Error in template", value, type(value)
-                    print "Relevant Environment:"
-                    for key, v in env.items():
-                        if key in value:
-                            if hasattr(v, 'findall'):
-                                v = xml.etree.ElementTree.tostring(v)
-                            print key + "\t" + str(v)[:1000]
-                    raise e, None, trace
-            else:
-                this = value
-
-            if key is not None:
-                parent[key] = this
-            else:
-                parent.append(this)
-        return result
     
     generated = list(transform.subjects(prov.wasGeneratedBy))[0]
     print "Generating", generated.identifier
@@ -626,19 +631,21 @@ def json_transform(transform, resources):
             try:
                 root = {
                     "@id": generated.identifier,
-                    "@graph": process_row(row, jslt, rowname, table, resources)
+                    "@graph": process_row(row, jslt, rowname, table, resources, transform, variables)
                 }
                 if context is not None:
                     root['@context'] = context
                 before = len(result)
                 #graph = ConjunctiveGraph(identifier=generated.identifier)
                 #graph.parse(data=json.dumps(root),format="json-ld")
-                result.parse(data=json.dumps(root), format="json-ld")
+                data = json.dumps(root)
+                del root
+                result.parse(data=data, format="json-ld")
+                del data
                 after = len(result)
                 sys.stdout.write('\r')
                 sys.stdout.write("Row "+str(rowname)+" added "+str(after-before)+" triples.")
                 sys.stdout.flush()
-
             except Exception as e:
                 trace = sys.exc_info()[2]
                 if isinstance(table, pandas.DataFrame):
@@ -646,13 +653,10 @@ def json_transform(transform, resources):
                 else:
                     print "Error on", rowname
                 raise e, None, trace
+                
         print ""
-        if len(result) == 0:
-            print "This isn't parsing as RDF:"
-            print json.dumps(root)
     resources[generated.identifier] = result
-    
-            
+
 def transform(transform_resource, resources):
     print 'Transforming',transform_resource.identifier
 

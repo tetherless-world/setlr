@@ -7,6 +7,7 @@ http://dalkescientific.com/writings/diary/archive/2006/11/06/iterparse_filter.ht
 
 __version__ = "0.9-experimental"
 
+from memory_profiler import profile, memory_usage
 
 import re
 
@@ -375,7 +376,7 @@ class FilterAutomata(object):
     # but without any references to callbacks
     def iterparse(self, file, validate_dtd=False):
         return self.parse(file, None, validate_dtd)
-        
+
     def parse(self, file, state=None, validate_dtd=False):
         if not dtd_validation:
             validate_dtd = False
@@ -395,49 +396,67 @@ class FilterAutomata(object):
         kwargs = {}
         if validate_dtd:
             kwargs = dict(dtd_validation=True)
+        last_start = 0
+        total_mem = 0
+        before = None
         for (event, ele) in etree.iterparse(file, needed_actions, **kwargs):
             if event == "start":
                 tag = ele.tag
                 # Descend into node; track where I am
                 tag_stack_append(tag)
                 node_stack_append(node)
-                try:
-                    node = node[0][tag]
-                except KeyError:
-                    # No child exists; figure out what to do
-                    stack_as_path = "/" + ("/".join(tag_stack)) + "/"
-                    new_node = self._new_node(stack_as_path)
-                    
-                    node[0][tag] = new_node
-                    node = new_node
+                stack_as_path = "/" + ("/".join(tag_stack)) + "/"
+                new_node = self._new_node(stack_as_path)
+                node = new_node
 
                 # call the start handlers then yield the element
                 for start_handler in node[1]:
                     start_handler(event, ele, state)
                 if node[3]:
                     yield (event, ele)
+                #print total_mem
 
             elif event == "end":
                 # call the end handlers then yield the element
                 for end_handler in node[2]:
                     end_handler(event, ele, state)
+                del tag_stack[-1]
                 if node[4]:
                     yield (event, ele)
-                del tag_stack[-1]
+                    # It's safe to call clear() here because no descendants will be
+                    # accessed
+                    ele.clear()
+                    ele.getparent().remove(ele)
+
+                    # Also eliminate now-empty references from the root node to elem
+                    #for ancestor in ele.xpath('ancestor-or-self::*'):
+                    #    while ancestor.getprevious() is not None:
+                    #        del ancestor.getparent()[0]
                 node = node_stack.pop()
 
             elif event == "start-ns":
                 for handler in self.start_ns_handlers:
                     handler(event, ele, state)
                 if self.iter_start_ns:
+                    print 'start-ns'
                     yield (event, ele)
                 
             elif event == "end-ns":
                 for handler in self.end_ns_handlers:
                     handler(event, ele, state)
                 if self.iter_start_ns:
+                    print 'end-ns'
                     yield (event, ele)
-
+                    # It's safe to call clear() here because no descendants will be
+                    # accessed
+                    ele.clear()
+                    ele.getparent().remove(ele)
+                    # Also eliminate now-empty references from the root node to elem
+                    #for ancestor in ele.xpath('ancestor-or-self::*'):
+                    #    while ancestor.getprevious() is not None:
+                    #        del ancestor.getparent()[0]
+                    
+        print "Total memory usage", total_mem
         for handler in self.end_document_handlers:
             handler("end-document", None, state)
 
