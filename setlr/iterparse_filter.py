@@ -7,8 +7,6 @@ http://dalkescientific.com/writings/diary/archive/2006/11/06/iterparse_filter.ht
 
 __version__ = "0.9-experimental"
 
-from memory_profiler import profile, memory_usage
-
 import re
 
 dtd_validation = False
@@ -456,7 +454,6 @@ class FilterAutomata(object):
                     #    while ancestor.getprevious() is not None:
                     #        del ancestor.getparent()[0]
                     
-        print "Total memory usage", total_mem
         for handler in self.end_document_handlers:
             handler("end-document", None, state)
 
