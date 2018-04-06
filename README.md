@@ -7,11 +7,7 @@ setlr is a tool for generating RDF graphs, including named graphs, from almost a
 Simply check out the code, optionally create a python virtual environment, and install it using pip:
 
 ```bash
-git clone git@github.com:tetherless-world/setlr.git
-cd setlr
-virtualenv --no-site-packages venv
-source venv/bin/activate
-pip install -e .
+pip install setlr
 ```
 
 # Learning how to SETL
