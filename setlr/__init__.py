@@ -27,6 +27,8 @@ from itertools import chain
 import zipfile
 import gzip
 
+import logging
+
 import hashlib
 from slugify import slugify
 
@@ -135,7 +137,7 @@ def read_csv(location, result):
     if result.value(csvw.header):
         args['header'] = [0]
     df = pandas.read_csv(get_content(location, result),encoding='utf-8', **args)
-    print "Loaded", location
+    logger.debug("Loaded %s", location)
     return df
         
 def read_graph(location, result, g = None):
@@ -153,7 +155,7 @@ def read_graph(location, result, g = None):
                 #print e
                 pass
         if len(graph) == 0:
-            print "Could not parse graph: ", location
+            logger.error("Could not parse graph: %s", location)
         if result[RDF.type:OWL.Ontology]:
             for ontology in graph.subjects(RDF.type, OWL.Ontology):
                 imports = [graph.resource(x) for x in graph.objects(ontology, OWL.imports)]
@@ -210,14 +212,12 @@ def get_content(location, result):
 
 def to_tempfile(f):
     tf = tempfile.TemporaryFile()
-    print "Writing to disk"
+    logger.debug("Writing %s to disk.", f)
     for chunk in f:
         if chunk: # filter out keep-alive new chunks
             tf.write(chunk)
-            sys.stdout.write(".")
-            sys.stdout.flush()
     tf.seek(0)
-    print "done."
+    logger.debug("Finished writing %s to disk.", f)
     return tf
 
 def unpack_zipfile(f):
@@ -248,7 +248,7 @@ def read_xml(location, result):
         validate_dtd = True
     f = iterparse_filter.IterParseFilter(validate_dtd=validate_dtd)
     if result.value(setl.xpath) is None:
-        print "no xpath to select on!"
+        logger.debug("no xpath to select on from %s", location)
         f.iter_end("/*")
     for xp in result[setl.xpath]:
         f.iter_end(xp.value)
@@ -327,7 +327,7 @@ def load_csv(csv_resource):
             lit =  Literal(value, datatype=datatype.identifier)
             #print i, prop.identifier, lit.n3()
             res.add(prop.identifier, lit)
-    print "Table has", len(s), "rows,", len(header), "columns, and", len(csv_graph), "triples."
+    logger.debug("Table has %s rows, %s columns, and %s triples", len(s), len(header), len(csv_graph))
     return csv_graph
 
 formats = {
@@ -375,7 +375,7 @@ def get_order(setl_graph):
     return toposort_flatten(nodes)
 
 def extract(e, resources):
-    print 'Extracting',e.identifier
+    logger.info('Extracting %s',e.identifier)
     used = e.value(prov.used)
     for result in e.subjects(prov.wasGeneratedBy):
         if used is None:
@@ -383,7 +383,7 @@ def extract(e, resources):
         for t in result[RDF.type]:
             # Do we know how to generate this?
             if t.identifier in extractors:
-                print "Extracted", used.identifier
+                logger.info("Extracted %s", used.identifier)
                 resources[result.identifier] = extractors[t.identifier](used.identifier, result)
                 return resources[result.identifier]
 
@@ -450,7 +450,7 @@ def process_row(row, template, rowname, table, resources, transform, variables):
         this = None
         if isinstance(parent, dict):
             if len(task) != 2:
-                print task
+                logger.debug(task)
             key, value = task
             kt = get_template(key)
             key = kt.render(**env)
@@ -469,13 +469,12 @@ def process_row(row, template, rowname, table, resources, transform, variables):
                     continue
                 except Exception as e:
                     trace = sys.exc_info()[2]
-                    print "Error in conditional", value['@if']
-                    print "Relevant Environment:"
+                    logger.error("Error in conditional %s\nRelevant Environment:", value['@if'])
                     for key, v in env.items():
-                        if key in value['@if']:
-                            if hasattr(v, 'findall'):
-                                v = xml.etree.ElementTree.tostring(v)
-                            print key + "\t" + str(v)[:1000]
+                        #if key in value['@if']:
+                        if hasattr(v, 'findall'):
+                            v = xml.etree.ElementTree.tostring(v)
+                        logger.error(key + "\t" + str(v)[:1000])
                     raise e, None, trace
             if '@for' in value:
                 f = value['@for']
@@ -504,8 +503,8 @@ def process_row(row, template, rowname, table, resources, transform, variables):
                     pass
                 except Exception as e:
                     trace = sys.exc_info()[2]
-                    print "Error in for:", value['@for']
-                    print "Locals:", env.keys()
+                    logger.error("Error in @for: %s", value['@for'])
+                    logger.error("Locals: %s", env.keys())
                     raise e, None, trace
                 continue
             if '@with' in value:
@@ -534,8 +533,8 @@ def process_row(row, template, rowname, table, resources, transform, variables):
                     pass
                 except Exception as e:
                     trace = sys.exc_info()[2]
-                    print "Error in with:", value['@with']
-                    print "Locals:", env.keys()
+                    logger.error("Error in with: %s", value['@with'])
+                    logger.error("Locals: %s", env.keys())
                     raise e, None, trace
                 continue
             this = {}
@@ -555,13 +554,13 @@ def process_row(row, template, rowname, table, resources, transform, variables):
                 this = template.render(**env)
             except Exception as e:
                 trace = sys.exc_info()[2]
-                print "Error in template", value, type(value)
-                print "Relevant Environment:"
+                logger.error("Error in template %s %s", value, type(value))
+                logger.error("Relevant Environment:")
                 for key, v in env.items():
-                    if key in value:
-                        if hasattr(v, 'findall'):
-                            v = xml.etree.ElementTree.tostring(v)
-                        print key + "\t" + str(v)[:1000]
+                    #if key in value:
+                    if hasattr(v, 'findall'):
+                        v = xml.etree.ElementTree.tostring(v)
+                    logger.error(key + "\t" + str(v)[:1000])
                 raise e, None, trace
         else:
             this = value
@@ -573,7 +572,7 @@ def process_row(row, template, rowname, table, resources, transform, variables):
     return result
 
 def json_transform(transform, resources):
-    print "Transforming", transform.identifier
+    logger.info("Transforming %s", transform.identifier)
     tables = [u for u in transform[prov.used]]
     variables = {}
     for usage in transform[prov.qualifiedUsage]:
@@ -584,7 +583,7 @@ def json_transform(transform, resources):
         #print "Using", used.identifier, "as", roleID.value
     
     generated = list(transform.subjects(prov.wasGeneratedBy))[0]
-    print "Generating", generated.identifier
+    logger.info("Generating %s", generated.identifier)
 
     if generated.identifier in resources:
         result = resources[generated.identifier]
@@ -594,7 +593,7 @@ def json_transform(transform, resources):
             result = ConjunctiveGraph(store="Sleepycat")
         if generated[RDF.type : setl.Persisted]:
             tempdir = tempfile.mkdtemp()
-            print "Persisting", generated.identifier, "to", tempdir
+            logger.info("Persisting %s to %s", generated.identifier, tempdir)
             result.store.open(tempdir, True)
     s = transform.value(prov.value).value
     try:
@@ -602,26 +601,26 @@ def json_transform(transform, resources):
     except Exception as e:
         trace = sys.exc_info()[2]
         if 'No JSON object could be decoded' in e.message:
-            print s
+            logger.error(s)
         if 'line' in e.message:
             line = int(re.search("line ([0-9]+)", e.message).group(1))
-            print "Error in parsing JSON Template at line %d:" % line
-            print '\n'.join(["%d: %s"%(i+line-3, x) for i, x in enumerate(s.split("\n")[line-3:line+4])])
+            logger.error("Error in parsing JSON Template at line %d:", line)
+            logger.error('\n'.join(["%d: %s"%(i+line-3, x) for i, x in enumerate(s.split("\n")[line-3:line+4])]))
         raise e, None, trace
     context = transform.value(setl.hasContext)
     if context is not None:
         context = json.loads(context.value)
     for t in tables:
-        print "Using", t.identifier
+        logger.info("Using %s", t.identifier)
         table = resources[t.identifier]
         it = table
         if isinstance(table, pandas.DataFrame):
             #if run_samples:
             #    table = table.head()
             it = table.iterrows()
-            print "Transforming", len(table.index), "rows."
+            logger.info("Transforming %s rows.", len(table.index))
         else:
-            print "Transforming", t.identifier
+            logger.info("Transforming %s", t.identifier)
         for rowname, row in it:
             if run_samples and rowname >= 100:
                 break
@@ -640,22 +639,20 @@ def json_transform(transform, resources):
                 result.parse(data=data, format="json-ld")
                 del data
                 after = len(result)
-                sys.stdout.write('\r')
-                sys.stdout.write("Row "+str(rowname)+" added "+str(after-before)+" triples.")
+                logger.debug("Row "+str(rowname)+" added "+str(after-before)+" triples.")
                 sys.stdout.flush()
             except Exception as e:
                 trace = sys.exc_info()[2]
                 if isinstance(table, pandas.DataFrame):
-                    print "Error on", rowname, row
+                    logger.error("Error on %s %s", rowname, row)
                 else:
-                    print "Error on", rowname
+                    logger.error("Error on %s", rowname)
                 raise e, None, trace
                 
-        print ""
     resources[generated.identifier] = result
 
 def transform(transform_resource, resources):
-    print 'Transforming',transform_resource.identifier
+    logger.info('Transforming %s',transform_resource.identifier)
 
     transform_graph = ConjunctiveGraph()
     for result in transform_graph.subjects(prov.wasGeneratedBy):
@@ -669,26 +666,26 @@ def transform(transform_resource, resources):
 
     
     for script in [u for u in used if u[RDF.type:setl.PythonScript]]:
-        print "Script:", script.identifier
+        logger.info("Script: %s", script.identifier)
         s = script.value(prov.value).value
         l = dict(graph = transform_graph, setl_graph = transform_resource.graph)
         gl = dict()
         exec(s, gl, l)
 
     for jsldt in [u for u in used if u[RDF.type:setl.PythonScript]]:
-        print "Script:", script.identifier
+        logger.info("Script: %s", script.identifier)
         s = script.value(prov.value).value
         l = dict(graph = transform_graph, setl_graph = transform_resource.graph)
         gl = dict()
         exec(s, gl, l)
 
     for update in [u for u in used if u[RDF.type:sp.Update]]:
-        print "Update:", update.identifier
+        logger.info("Update: %s", update.identifier)
         query = update.value(prov.value).value
         transform_graph.update(query)
         
     for construct in [u for u in used if u[RDF.type:sp.Construct]]:
-        print "Construct:", construct.identifier
+        logger.info("Construct: %s", construct.identifier)
         query = construct.value(prov.value).value
         g = transform_graph.query(query)
         transform_graph += g
@@ -703,7 +700,7 @@ def transform(transform_resource, resources):
 
         
 def load(load_resource, resources):
-    print 'Loading',load_resource.identifier
+    logger.info('Loading %s',load_resource.identifier)
     file_graph = Dataset(default_union=True)
     to_disk = False
     for used in load_resource[prov.used]:
@@ -711,15 +708,15 @@ def load(load_resource, resources):
             to_disk = True
             file_graph = Dataset(store='Sleepycat', default_union=True)
             tempdir = tempfile.mkdtemp()
-            print "Gathering", load_resource.identifier, "into", tempdir
+            logger.debug("Gathering %s into %s", load_resource.identifier, tempdir)
             file_graph.store.open(tempdir, True)
             break
     if len(list(load_resource[prov.used])) == 1:
-        print "Using",load_resource.value(prov.used).identifier
+        logger.info("Using %s",load_resource.value(prov.used).identifier)
         file_graph = resources[load_resource.value(prov.used).identifier]
     else:
         for used in load_resource[prov.used]:
-            print "Using",used.identifier
+            logger.info("Using %s",used.identifier)
             used_graph = resources[used.identifier]
             file_graph.namespace_manager = used_graph.namespace_manager
             #print used_graph.serialize(format="trig")
@@ -757,6 +754,9 @@ actions = {
 }
             
 def _setl(setl_graph):
+    global logger
+    if logger is None:
+        logger = logging.getLogger(__name__)
     resources = {}
     resources.update(actions)
 
@@ -767,14 +767,23 @@ def _setl(setl_graph):
         if len(action) > 0:
             action[0](task, resources)
     return resources
+logger = None
 
 def main():
     args = sys.argv[1:]
+    logging_level = logging.DEBUG
+    if '-q' in args or '--quiet' in args:
+        logging_level = logging.WARNING
+    logging.basicConfig(level=logging_level)
+
+    global logger
+    logger = logging.getLogger(__name__)
+    
     global run_samples
     setl_file = args[0]
     if 'sample' in args:
         run_samples = True
-        print "Only processing a few sample rows."
+        logger.warning("Only processing a few sample rows.")
     setl_graph = ConjunctiveGraph()
     content = open(setl_file).read()
     setl_graph.parse(data=content, format="turtle")
@@ -782,7 +791,7 @@ def main():
     graphs = _setl(setl_graph)
 #    print "Finished processing"
 #    return graphs
-                
+
 if __name__ == '__main__':
     result = main()
-    print "Exiting"
+    logger.info("Exiting")
