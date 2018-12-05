@@ -11,9 +11,10 @@ import requests
 import pandas
 import re
 import os
+from six import text_type as unicode
+
 from jinja2 import Template
 from toposort import toposort_flatten
-from StringIO import StringIO
 from numpy import isnan
 import uuid
 import tempfile
@@ -166,7 +167,7 @@ def read_graph(location, result, g = None):
 class FileLikeFromIter(object):
     def __init__(self, content_iter):
         self.iter = content_iter
-        self.data = ''
+        self.data = b''
 
     def __iter__(self):
         return self.iter
@@ -177,7 +178,7 @@ class FileLikeFromIter(object):
         else:
             while len(self.data) < n:
                 try:
-                    self.data = ''.join((self.data, self.iter.next()))
+                    self.data = b''.join((self.data, next(self.iter)))
                 except StopIteration:
                     break
             result, self.data = self.data[:n], self.data[n:]
@@ -475,7 +476,7 @@ def process_row(row, template, rowname, table, resources, transform, variables):
                         if hasattr(v, 'findall'):
                             v = xml.etree.ElementTree.tostring(v)
                         logger.error(key + "\t" + str(v)[:1000])
-                    raise e, None, trace
+                    raise(e, None, trace)
             if '@for' in value:
                 f = value['@for']
                 if isinstance(f, list):
@@ -505,7 +506,7 @@ def process_row(row, template, rowname, table, resources, transform, variables):
                     trace = sys.exc_info()[2]
                     logger.error("Error in @for: %s", value['@for'])
                     logger.error("Locals: %s", env.keys())
-                    raise e, None, trace
+                    raise(e, None, trace)
                 continue
             if '@with' in value:
                 f = value['@with']
@@ -535,7 +536,7 @@ def process_row(row, template, rowname, table, resources, transform, variables):
                     trace = sys.exc_info()[2]
                     logger.error("Error in with: %s", value['@with'])
                     logger.error("Locals: %s", env.keys())
-                    raise e, None, trace
+                    raise(e, None, trace)
                 continue
             this = {}
             for child in value.items():
@@ -561,7 +562,7 @@ def process_row(row, template, rowname, table, resources, transform, variables):
                     if hasattr(v, 'findall'):
                         v = xml.etree.ElementTree.tostring(v)
                     logger.error(key + "\t" + str(v)[:1000])
-                raise e, None, trace
+                raise(e, None, trace)
         else:
             this = value
 
@@ -590,9 +591,9 @@ def json_transform(transform, resources):
     else:
         result = ConjunctiveGraph()
         if generated[RDF.type : setl.Persisted]:
-            result = ConjunctiveGraph(store="Sleepycat")
+            result = ConjunctiveGraph(store="FastTable")
         if generated[RDF.type : setl.Persisted]:
-            tempdir = tempfile.mkdtemp()
+            _, tempdir = tempfile.mkstemp()
             logger.info("Persisting %s to %s", generated.identifier, tempdir)
             result.store.open(tempdir, True)
     s = transform.value(prov.value).value
@@ -606,7 +607,7 @@ def json_transform(transform, resources):
             line = int(re.search("line ([0-9]+)", e.message).group(1))
             logger.error("Error in parsing JSON Template at line %d:", line)
             logger.error('\n'.join(["%d: %s"%(i+line-3, x) for i, x in enumerate(s.split("\n")[line-3:line+4])]))
-        raise e, None, trace
+        raise(e, None, trace)
     context = transform.value(setl.hasContext)
     if context is not None:
         context = json.loads(context.value)
@@ -647,7 +648,7 @@ def json_transform(transform, resources):
                     logger.error("Error on %s %s", rowname, row)
                 else:
                     logger.error("Error on %s", rowname)
-                raise e, None, trace
+                raise(e, None, trace)
                 
     resources[generated.identifier] = result
 
@@ -706,8 +707,8 @@ def load(load_resource, resources):
     for used in load_resource[prov.used]:
         if used[RDF.type : setl.Persisted]:
             to_disk = True
-            file_graph = Dataset(store='Sleepycat', default_union=True)
-            tempdir = tempfile.mkdtemp()
+            file_graph = Dataset(store='FastTable', default_union=True)
+            _, tempdir = tempfile.mkstemp()
             logger.debug("Gathering %s into %s", load_resource.identifier, tempdir)
             file_graph.store.open(tempdir, True)
             break

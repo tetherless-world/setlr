@@ -10,7 +10,7 @@ def read(fname):
 
 setup(
     name = "setlr",
-    version = "0.2.3",
+    version = "0.2.5",
     author = "Jim McCusker",
     author_email = "mccusj@cs.rpi.edu",
     description = ("setlr is a tool for Semantic Extraction, Transformation, and Loading."),
@@ -32,6 +32,7 @@ setup(
         'beautifulsoup4',
         'jinja2',
         'lxml',
+        'six',
         'xlrd',
         'ijson',
         'requests-testadapter',
@@ -41,7 +42,7 @@ setup(
         'console_scripts': ['setlr=setlr:main'],
     },
     classifiers=[
-        "Development Status :: 3 - Alpha",
+        "Development Status :: 5 - Production/Stable",
         "Topic :: Utilities",
         "License :: OSI Approved :: Apache Software License",
     ],

@@ -436,14 +436,14 @@ class FilterAutomata(object):
                 for handler in self.start_ns_handlers:
                     handler(event, ele, state)
                 if self.iter_start_ns:
-                    print 'start-ns'
+                    print('start-ns')
                     yield (event, ele)
                 
             elif event == "end-ns":
                 for handler in self.end_ns_handlers:
                     handler(event, ele, state)
                 if self.iter_start_ns:
-                    print 'end-ns'
+                    print('end-ns')
                     yield (event, ele)
                     # It's safe to call clear() here because no descendants will be
                     # accessed
@@ -621,7 +621,7 @@ def test_parse():
     import os
     filename = "/Users/dalke/Music/iTunes/iTunes Music Library.xml"
     if not os.path.exists(filename):
-        print "Cannot find %r: skipping test" % (filename,)
+        print ("Cannot find %r: skipping test" % (filename,))
         return
 
     # Work through callbacks
@@ -633,7 +633,7 @@ def test_parse():
             key = child.text
             value = children.next().text
             d[key] = value
-        print "%r is by %r" % (d["Name"], d.get("Artist", "<unknown>"))
+        print ("%r is by %r" % (d["Name"], d.get("Artist", "<unknown>")))
         ele.clear()
             
     ef.on_end("/plist/dict/dict/dict", print_info)
@@ -649,7 +649,7 @@ def test_parse():
             key = child.text
             value = children.next().text
             d[key] = value
-        print "%r is a %r song" % (d["Name"], d.get("Genre", "<unknown>"))
+        print ("%r is a %r song" % (d["Name"], d.get("Genre", "<unknown>")))
         ele.clear()
             
 
@@ -660,4 +660,4 @@ def test():
 
 if __name__ == "__main__":
     test()
-    print "All tests passed."
+    print ("All tests passed.")
