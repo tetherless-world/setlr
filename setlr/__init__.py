@@ -591,9 +591,9 @@ def json_transform(transform, resources):
     else:
         result = ConjunctiveGraph()
         if generated[RDF.type : setl.Persisted]:
-            result = ConjunctiveGraph(store="FastTable")
+            result = ConjunctiveGraph(store="Sleepycat")
         if generated[RDF.type : setl.Persisted]:
-            _, tempdir = tempfile.mkstemp()
+            tempdir = tempfile.mkdtemp()
             logger.info("Persisting %s to %s", generated.identifier, tempdir)
             result.store.open(tempdir, True)
     s = transform.value(prov.value).value
@@ -707,8 +707,8 @@ def load(load_resource, resources):
     for used in load_resource[prov.used]:
         if used[RDF.type : setl.Persisted]:
             to_disk = True
-            file_graph = Dataset(store='FastTable', default_union=True)
-            _, tempdir = tempfile.mkstemp()
+            file_graph = Dataset(store='Sleepycat', default_union=True)
+            tempdir = tempfile.mkdtemp()
             logger.debug("Gathering %s into %s", load_resource.identifier, tempdir)
             file_graph.store.open(tempdir, True)
             break
