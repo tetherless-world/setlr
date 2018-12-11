@@ -424,7 +424,8 @@ class FilterAutomata(object):
                     # It's safe to call clear() here because no descendants will be
                     # accessed
                     ele.clear()
-                    ele.getparent().remove(ele)
+                    if ele.getparent() is not None:
+                        ele.getparent().remove(ele)
 
                     # Also eliminate now-empty references from the root node to elem
                     #for ancestor in ele.xpath('ancestor-or-self::*'):
