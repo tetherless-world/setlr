@@ -3,6 +3,7 @@
 For details see:
 http://dalkescientific.com/writings/diary/archive/2006/11/06/iterparse_filter.html
 """
+from __future__ import print_function
 # I have got to rearrange my site to use shorter URLs.
 
 __version__ = "0.9-experimental"

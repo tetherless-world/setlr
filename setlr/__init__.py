@@ -476,7 +476,7 @@ def process_row(row, template, rowname, table, resources, transform, variables):
                         if hasattr(v, 'findall'):
                             v = xml.etree.ElementTree.tostring(v)
                         logger.error(key + "\t" + str(v)[:1000])
-                    raise(e, None, trace)
+                    raise e
             if '@for' in value:
                 f = value['@for']
                 if isinstance(f, list):
@@ -506,7 +506,7 @@ def process_row(row, template, rowname, table, resources, transform, variables):
                     trace = sys.exc_info()[2]
                     logger.error("Error in @for: %s", value['@for'])
                     logger.error("Locals: %s", env.keys())
-                    raise(e, None, trace)
+                    raise e
                 continue
             if '@with' in value:
                 f = value['@with']
@@ -536,7 +536,7 @@ def process_row(row, template, rowname, table, resources, transform, variables):
                     trace = sys.exc_info()[2]
                     logger.error("Error in with: %s", value['@with'])
                     logger.error("Locals: %s", env.keys())
-                    raise(e, None, trace)
+                    raise e
                 continue
             this = {}
             for child in value.items():
@@ -562,7 +562,7 @@ def process_row(row, template, rowname, table, resources, transform, variables):
                     if hasattr(v, 'findall'):
                         v = xml.etree.ElementTree.tostring(v)
                     logger.error(key + "\t" + str(v)[:1000])
-                raise(e, None, trace)
+                raise e
         else:
             this = value
 
@@ -607,7 +607,7 @@ def json_transform(transform, resources):
             line = int(re.search("line ([0-9]+)", e.message).group(1))
             logger.error("Error in parsing JSON Template at line %d:", line)
             logger.error('\n'.join(["%d: %s"%(i+line-3, x) for i, x in enumerate(s.split("\n")[line-3:line+4])]))
-        raise(e, None, trace)
+        raise e
     context = transform.value(setl.hasContext)
     if context is not None:
         context = json.loads(context.value)
@@ -648,7 +648,7 @@ def json_transform(transform, resources):
                     logger.error("Error on %s %s", rowname, row)
                 else:
                     logger.error("Error on %s", rowname)
-                raise(e, None, trace)
+                raise e
                 
     resources[generated.identifier] = result
 
