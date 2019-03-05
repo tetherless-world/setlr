@@ -243,7 +243,8 @@ def read_excel(location, result):
     )
     if result.value(csvw.header):
         args['header'] = [result.value(csvw.header).value]
-    df = pandas.read_excel(get_content(location, result),encoding='utf-8', **args)
+    with get_content(location, result) as f:
+        df = pandas.read_excel(f,encoding='utf-8', **args)
     return df
 
 def read_xml(location, result):
@@ -256,8 +257,9 @@ def read_xml(location, result):
         f.iter_end("/*")
     for xp in result[setl.xpath]:
         f.iter_end(xp.value)
-    for (i, (event, ele)) in enumerate(f.iterparse(get_content(location, result))):
-        yield i, ele
+    with get_content(location, result) as fo:
+        for (i, (event, ele)) in enumerate(f.iterparse(fo)):
+            yield i, ele
 
              
 def read_json(location, result):
@@ -266,7 +268,8 @@ def read_json(location, result):
         selector = selector.value
     else:
         selector = ""
-    return enumerate(ijson.items(get_content(location, result), selector))
+    with get_content(location, result) as fo:
+        return enumerate(ijson.items(fo, selector))
             
 
 extractors = {
