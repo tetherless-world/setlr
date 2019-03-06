@@ -3,8 +3,13 @@
 For details see:
 http://dalkescientific.com/writings/diary/archive/2006/11/06/iterparse_filter.html
 """
+from __future__ import print_function
 # I have got to rearrange my site to use shorter URLs.
 
+from future import standard_library
+standard_library.install_aliases()
+from builtins import zip
+from builtins import object
 __version__ = "0.9-experimental"
 
 import re
@@ -543,7 +548,7 @@ def test_syntax():
                                  (xpath, tag_list, got, bool(expect)))
 
 def test_filtering():
-    import cStringIO as StringIO
+    import io as StringIO
     f = StringIO.StringIO("""\
  <A><AA>
    <B xmlns="http://z/"><C/><spam:D xmlns:spam="http://spam/">eggs</spam:D></B>

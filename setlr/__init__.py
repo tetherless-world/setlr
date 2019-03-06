@@ -1,6 +1,9 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+from builtins import str
+from builtins import next
+from builtins import object
 from rdflib import *
 from rdflib.util import guess_format
 import rdflib
@@ -11,7 +14,7 @@ import requests
 import pandas
 import re
 import os
-from six import text_type as unicode
+from six import text_type as str
 
 from jinja2 import Template
 from toposort import toposort_flatten
@@ -19,7 +22,7 @@ from numpy import isnan
 import uuid
 import tempfile
 import ijson
-from . import iterparse_filter
+import iterparse_filter
 #import xml.etree.ElementTree as ET
 import xml.etree.ElementTree
 
@@ -174,7 +177,7 @@ class FileLikeFromIter(object):
 
     def read(self, n=None):
         if n is None:
-            return self.data + ''.join(l for l in self.iter)
+            return self.data + b''.join(l for l in self.iter)
         else:
             while len(self.data) < n:
                 try:
@@ -461,7 +464,7 @@ def process_row(row, template, rowname, table, resources, transform, variables):
         if isinstance(value, dict):
             if '@if' in value:
                 try:
-                    fn = get_function(value['@if'], env.keys())
+                    fn = get_function(value['@if'], list(env.keys()))
                     incl = fn(**env)
                     if incl is None or not incl:
                         continue
@@ -474,12 +477,12 @@ def process_row(row, template, rowname, table, resources, transform, variables):
                 except Exception as e:
                     trace = sys.exc_info()[2]
                     logger.error("Error in conditional %s\nRelevant Environment:", value['@if'])
-                    for key, v in env.items():
+                    for key, v in list(env.items()):
                         #if key in value['@if']:
                         if hasattr(v, 'findall'):
                             v = xml.etree.ElementTree.tostring(v)
                         logger.error(key + "\t" + str(v)[:1000])
-                    raise(e, None, trace)
+                    raise e
             if '@for' in value:
                 f = value['@for']
                 if isinstance(f, list):
@@ -492,7 +495,7 @@ def process_row(row, template, rowname, table, resources, transform, variables):
                 else:
                     del val['@for']
                 try:
-                    fn = get_function(expression, env.keys())
+                    fn = get_function(expression, list(env.keys()))
                     values = fn(**env)
                     if values is not None:
                         for v in values:
@@ -508,8 +511,8 @@ def process_row(row, template, rowname, table, resources, transform, variables):
                 except Exception as e:
                     trace = sys.exc_info()[2]
                     logger.error("Error in @for: %s", value['@for'])
-                    logger.error("Locals: %s", env.keys())
-                    raise(e, None, trace)
+                    logger.error("Locals: %s", list(env.keys()))
+                    raise e
                 continue
             if '@with' in value:
                 f = value['@with']
@@ -523,7 +526,7 @@ def process_row(row, template, rowname, table, resources, transform, variables):
                 else:
                     del val['@with']
                 try:
-                    fn = get_function(expression, env.keys())
+                    fn = get_function(expression, list(env.keys()))
                     v = fn(**env)
                     if v is not None:
                         if len(variable_list) == 1:
@@ -538,11 +541,11 @@ def process_row(row, template, rowname, table, resources, transform, variables):
                 except Exception as e:
                     trace = sys.exc_info()[2]
                     logger.error("Error in with: %s", value['@with'])
-                    logger.error("Locals: %s", env.keys())
-                    raise(e, None, trace)
+                    logger.error("Locals: %s", list(env.keys()))
+                    raise e
                 continue
             this = {}
-            for child in value.items():
+            for child in list(value.items()):
                 if child[0] == '@if':
                     continue
                 if child[0] == '@for':
@@ -552,20 +555,20 @@ def process_row(row, template, rowname, table, resources, transform, variables):
             this = []
             for child in value:
                 todo.append((child, this, env))
-        elif isinstance(value, unicode):
+        elif isinstance(value, str):
             try:
-                template = get_template(unicode(value))
+                template = get_template(str(value))
                 this = template.render(**env)
             except Exception as e:
                 trace = sys.exc_info()[2]
                 logger.error("Error in template %s %s", value, type(value))
                 logger.error("Relevant Environment:")
-                for key, v in env.items():
+                for key, v in list(env.items()):
                     #if key in value:
                     if hasattr(v, 'findall'):
                         v = xml.etree.ElementTree.tostring(v)
                     logger.error(key + "\t" + str(v)[:1000])
-                raise(e, None, trace)
+                raise e
         else:
             this = value
 
@@ -610,7 +613,7 @@ def json_transform(transform, resources):
             line = int(re.search("line ([0-9]+)", e.message).group(1))
             logger.error("Error in parsing JSON Template at line %d:", line)
             logger.error('\n'.join(["%d: %s"%(i+line-3, x) for i, x in enumerate(s.split("\n")[line-3:line+4])]))
-        raise(e, None, trace)
+        raise e
     context = transform.value(setl.hasContext)
     if context is not None:
         context = json.loads(context.value)
@@ -651,7 +654,7 @@ def json_transform(transform, resources):
                     logger.error("Error on %s %s", rowname, row)
                 else:
                     logger.error("Error on %s", rowname)
-                raise(e, None, trace)
+                raise e
                 
     resources[generated.identifier] = result
 
