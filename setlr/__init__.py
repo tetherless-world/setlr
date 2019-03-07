@@ -22,7 +22,7 @@ from numpy import isnan
 import uuid
 import tempfile
 import ijson
-import .iterparse_filter
+import setlr import iterparse_filter
 #import xml.etree.ElementTree as ET
 import xml.etree.ElementTree
 
