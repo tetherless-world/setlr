@@ -10,7 +10,7 @@ def read(fname):
 
 setup(
     name = "setlr",
-    version = "0.2.10",
+    version = "0.2.13",
     author = "Jim McCusker",
     author_email = "mccusj@cs.rpi.edu",
     description = ("setlr is a tool for Semantic Extraction, Transformation, and Loading."),
@@ -26,7 +26,7 @@ setup(
         'numpy',
         'rdflib',
         'rdflib-jsonld',
-        'pandas==0.22.0',
+        'pandas',
         'requests',
         'toposort',
         'beautifulsoup4',
@@ -37,6 +37,7 @@ setup(
         'ijson',
         'requests-testadapter',
         'python-slugify',
+        'future',
     ],
     entry_points = {
         'console_scripts': ['setlr=setlr:main'],
