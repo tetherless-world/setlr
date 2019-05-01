@@ -12,4 +12,4 @@ pip install setlr
 
 # Learning how to SETL
 
-To learn how to use setlr please visit [the tutorial wiki page](https://github.com/tetherless-world/setlr/wiki/SETLr-Tutorial).
+To learn how to use setlr please visit [the tutorial wiki page](https://github.com/tetherless-world/setlr/wiki/SETLr-Basics-Tutorial).
