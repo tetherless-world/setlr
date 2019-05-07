@@ -10,7 +10,7 @@ def read(fname):
 
 setup(
     name = "setlr",
-    version = "0.2.12",
+    version = "0.2.13",
     author = "Jim McCusker",
     author_email = "mccusj@cs.rpi.edu",
     description = ("setlr is a tool for Semantic Extraction, Transformation, and Loading."),
@@ -21,6 +21,7 @@ setup(
     long_description='''SETLr is a tool for generating RDF graphs, including named graphs, from almost any kind of tabular data.''',
     include_package_data = True,
     install_requires = [
+        'future',
         'pip>=9.0.0',
         'cython',
         'numpy',
