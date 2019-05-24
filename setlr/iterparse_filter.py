@@ -13,6 +13,8 @@ from builtins import object
 __version__ = "0.9-experimental"
 
 import re
+import io
+import StringIO
 
 dtd_validation = False
 try:
@@ -402,7 +404,10 @@ class FilterAutomata(object):
         last_start = 0
         total_mem = 0
         before = None
-        for (event, ele) in etree.iterparse(file, needed_actions, **kwargs):
+        xml_bytes = io.BytesIO(file.read()) # iterparse doesn't like file, so we need to preprocess it
+        xml_str = xml_bytes.read()
+        xml_str = xml_str[xml_str.find("xml_str") + 52:-4]  # Need to figure out a better way to do this
+        for (event, ele) in etree.iterparse(StringIO.StringIO(xml_str), needed_actions, **kwargs):
             if event == "start":
                 tag = ele.tag
                 # Descend into node; track where I am

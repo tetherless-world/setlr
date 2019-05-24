@@ -136,7 +136,7 @@ def read_csv(location, result):
         sep = result.value(csvw.delimiter, default=Literal(",")).value,
         #header = result.value(csvw.headerRow, default=Literal(0)).value),
         skiprows = result.value(csvw.skipRows, default=Literal(0)).value,
-        dtype = object
+        # dtype = object
     )
     if result.value(csvw.header):
         args['header'] = [0]
@@ -173,7 +173,13 @@ class FileLikeFromIter(object):
         self.data = b''
 
     def __iter__(self):
-        return self.iter
+        return self.iter    # TODO Might need to be return self
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, err_type, value, tracebock):
+        pass
 
     def read(self, n=None):
         if n is None:
@@ -415,7 +421,7 @@ def get_function(expr, local_keys):
     if key not in functions:
         script = '''lambda %s: %s'''% (', '.join(sorted(local_keys)), expr)
         fn = eval(script)
-        fn.__name__ = str(expr)
+        fn.__name__ = expr.encode("ascii", "ignore")
         functions[key] = fn
     return functions[key]
 
