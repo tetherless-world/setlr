@@ -406,7 +406,7 @@ class FilterAutomata(object):
         before = None
         xml_bytes = io.BytesIO(file.read()) # iterparse doesn't like file, so we need to preprocess it
         xml_str = xml_bytes.read()
-        xml_str = xml_str[xml_str.find("xml_str") + 52:-4]  # Need to figure out a better way to do this
+        xml_str = xml_str[xml_str.find(">") + 1 : -4]  # iterparse doesn't seem to like having the xml header
         for (event, ele) in etree.iterparse(StringIO.StringIO(xml_str), needed_actions, **kwargs):
             if event == "start":
                 tag = ele.tag
