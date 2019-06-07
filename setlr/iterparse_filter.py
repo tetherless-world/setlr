@@ -13,8 +13,6 @@ from builtins import object
 __version__ = "0.9-experimental"
 
 import re
-import io
-import StringIO
 
 dtd_validation = False
 try:
@@ -404,11 +402,6 @@ class FilterAutomata(object):
         last_start = 0
         total_mem = 0
         before = None
-        # xml_bytes = io.BytesIO(file.read()) # iterparse doesn't like file, so we need to preprocess it
-        # xml_str = xml_bytes.read()
-        # xml_str = xml_str[xml_str.find(">") + 1 : -4]  # iterparse doesn't seem to like having the xml header
-        # xml_str = xml_str.replace('\\"', '"')
-        # crash = self / 0
         for (event, ele) in etree.iterparse(file, needed_actions, **kwargs):
             if event == "start":
                 tag = ele.tag
