@@ -404,11 +404,12 @@ class FilterAutomata(object):
         last_start = 0
         total_mem = 0
         before = None
-        xml_bytes = io.BytesIO(file.read()) # iterparse doesn't like file, so we need to preprocess it
-        xml_str = xml_bytes.read()
-        xml_str = xml_str[xml_str.find(">") + 1 : -4]  # iterparse doesn't seem to like having the xml header
-        xml_str = xml_str.replace('\\"', '"')
-        for (event, ele) in etree.iterparse(StringIO.StringIO(xml_str), needed_actions, **kwargs):
+        # xml_bytes = io.BytesIO(file.read()) # iterparse doesn't like file, so we need to preprocess it
+        # xml_str = xml_bytes.read()
+        # xml_str = xml_str[xml_str.find(">") + 1 : -4]  # iterparse doesn't seem to like having the xml header
+        # xml_str = xml_str.replace('\\"', '"')
+        # crash = self / 0
+        for (event, ele) in etree.iterparse(file, needed_actions, **kwargs):
             if event == "start":
                 tag = ele.tag
                 # Descend into node; track where I am
