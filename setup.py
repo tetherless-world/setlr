@@ -27,7 +27,7 @@ setup(
         'numpy',
         'rdflib',
         'rdflib-jsonld',
-        'pandas==0.22.0',
+        'pandas>=0.23.0',
         'requests',
         'toposort',
         'beautifulsoup4',
