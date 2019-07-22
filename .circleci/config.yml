@@ -1,0 +1,16 @@
+version: 2
+jobs:
+  build:
+    working_directory: /setlr
+    docker:
+      - image: python:3.7-stretch
+    steps:
+      - checkout
+      - run:
+          name: Install dependencies
+          command: pip3 install -e .
+      - run:
+          name: Lint the code
+          command: .circleci/lint.sh
+      - store_artifacts:
+          path: lint-results
