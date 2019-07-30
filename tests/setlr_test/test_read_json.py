@@ -7,41 +7,13 @@ from setlr import read_json
 # Checks the the file stays open through reading
 class TestReadJson(unittest.TestCase):
     def test_read_json(self):
-        expected_string = '''
-        [
-            {
-              "ID": "Alice",
-              "Name": "Alice Smith",
-              "MarriedTo": "Bob",
-              "Knows": "Bob; Charles",
-              "DOB": "1/12/1983"
-            },
-            {
-              "ID": "Bob",
-              "Name": "Bob Smith",
-              "MarriedTo": "Alice",
-              "Knows": "Alice; Charles",
-              "DOB": "3/23/1985"
-            },
-            {
-              "ID": "Charles",
-              "Name": "Charles Brown",
-              "MarriedTo": "",
-              "Knows": "Alice; Bob",
-              "DOB": "12/15/1955"
-            },
-            {
-              "ID": "Dave",
-              "Name": "Dave Jones",
-              "MarriedTo": "",
-              "Knows": "",
-              "DOB": "4/25/1967"
-            }
-        ]
-        '''
+        expected_string = ''
+        json_file = "tests/setlr_test/test_read_json.json"
+        with open(json_file) as f:
+            expected_string = f.read()
         expected_json = json.loads(expected_string)
         
-        result = read_json(("file:///apps/setlr/tests/setlr_test/test_read_json.json"), rdflib.resource.Resource(rdflib.graph.Graph(), "test_read_json"))
+        result = read_json(("file://{}".format(json_file)), rdflib.resource.Resource(rdflib.graph.Graph(), "test_read_json"))
         result = [r for r in result]      
 
         self.assertCountEqual(expected_json, result[0][1], "JSON objects not equal")
