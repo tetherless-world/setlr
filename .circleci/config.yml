@@ -9,8 +9,8 @@ jobs:
       - run:
           name: Install dependencies
           command: |
-            pip3 install -e .
-            pip3 install coverage nose2
+            pip3 install -q -e .
+            pip3 install -q coverage nose2
       - run:
           name: Run tests
           command: mkdir test-results && nose2
