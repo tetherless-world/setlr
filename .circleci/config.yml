@@ -10,10 +10,14 @@ jobs:
           name: Install dependencies
           command: |
             pip3 install -e .
-            pip3 install nose2
+            pip3 install coverage nose2
       - run:
           name: Run tests
-          command: python3 -m unittest tests/setlr_test/test_read_json.py
+          command: nose2
+      - store_artifacts:
+          path: htmlcov
+      - store_test_results:
+          path: nosetests.xml
   lint:
     working_directory: /setlr
     docker:
