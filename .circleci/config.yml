@@ -13,11 +13,11 @@ jobs:
             pip3 install coverage nose2
       - run:
           name: Run tests
-          command: nose2
+          command: mkdir test-results && nose2
       - store_artifacts:
           path: htmlcov
       - store_test_results:
-          path: nosetests.xml
+          path: test-results
   lint:
     working_directory: /setlr
     docker:
