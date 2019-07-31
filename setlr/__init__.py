@@ -269,7 +269,7 @@ def read_json(location, result):
     else:
         selector = ""
     with get_content(location, result) as fo:
-        return enumerate(ijson.items(fo, selector))
+        yield from enumerate(ijson.items(fo, selector))
             
 
 extractors = {
