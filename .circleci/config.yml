@@ -9,10 +9,33 @@ jobs:
       - run:
           name: Install dependencies
           command: |
-            pip3 install -e .
-            pip3 install flake8 pycodestyle pylint
+            pip3 install -q -e .
+            pip3 install -q coverage nose2
+      - run:
+          name: Run tests
+          command: mkdir test-results && nose2
+      - store_artifacts:
+          path: htmlcov
+      - store_test_results:
+          path: test-results
+  lint:
+    working_directory: /setlr
+    docker:
+      - image: python:3.7-stretch
+    steps:
+      - checkout
+      - run:
+          name: Install dependencies
+          command: pip3 install flake8 pycodestyle pylint vulture
       - run:
           name: Lint the code
           command: .circleci/lint.sh
       - store_artifacts:
           path: lint-results
+workflows:
+  version: 2
+  build_lint:
+    jobs:
+      - build
+      - lint
+
