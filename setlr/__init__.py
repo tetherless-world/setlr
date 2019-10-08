@@ -101,7 +101,7 @@ def read_csv(location, result):
         sep = result.value(csvw.delimiter, default=Literal(",")).value,
         #header = result.value(csvw.headerRow, default=Literal(0)).value),
         skiprows = result.value(csvw.skipRows, default=Literal(0)).value,
-        dtype = object
+        # dtype = object    # Does not seem to play well with future and python2/3 conversion
     )
     if result.value(csvw.header):
         args['header'] = [0]
@@ -139,6 +139,14 @@ class FileLikeFromIter(object):
 
     def __iter__(self):
         return self.iter
+
+    # Enter and Exit are needed to allow this to work with with
+    def __enter__(self):
+        return self
+
+    # Could be improved for better error/exception handling
+    def __exit__(self, err_type, value, tracebock):
+        pass
 
     def read(self, n=None):
         if n is None:
@@ -380,7 +388,7 @@ def get_function(expr, local_keys):
     if key not in functions:
         script = '''lambda %s: %s'''% (', '.join(sorted(local_keys)), expr)
         fn = eval(script)
-        fn.__name__ = str(expr)
+        fn.__name__ = expr.encode("ascii", "ignore")
         functions[key] = fn
     return functions[key]
 
