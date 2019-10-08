@@ -388,7 +388,7 @@ def get_function(expr, local_keys):
     if key not in functions:
         script = '''lambda %s: %s'''% (', '.join(sorted(local_keys)), expr)
         fn = eval(script)
-        fn.__name__ = expr.encode("ascii", "ignore")
+        fn.__name__ = expr.encode("ascii", "ignore").decode('utf8')
         functions[key] = fn
     return functions[key]
 
