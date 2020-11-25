@@ -106,7 +106,7 @@ def read_csv(location, result):
     )
     if result.value(csvw.header):
         args['header'] = [0]
-    df = pandas.read_csv(get_content(location, result),encoding='utf-8', **args)
+    df = pandas.read_csv(location,encoding='utf-8', **args)
     logger.debug("Loaded %s", location)
     return df
 
@@ -134,12 +134,35 @@ def read_graph(location, result, g = None):
     return g
 
 class FileLikeFromIter(object):
+    _closed = False
+
     def __init__(self, content_iter):
         self.iter = content_iter
         self.data = b''
 
     def __iter__(self):
         return self.iter
+
+    def readable(self):
+        return True
+
+    def writable(self):
+        return False
+
+    def seekable(self):
+        return False
+
+    def closed(self):
+        if self._closed:
+            return True
+        if len(self.data) > 0:
+            return False
+        try:
+            self.data = next(self.iter)
+        except StopIteration:
+            self.closed = True
+            return True
+        return False
 
     # Enter and Exit are needed to allow this to work with with
     def __enter__(self):
@@ -209,16 +232,20 @@ unpackers = {
     setl.GZipFile : lambda f: gzip.GzipFile(fileobj=f,mode='r')
 }
 
+packers = {
+#    setl.Tempfile : lambda x: x,
+    setl.GZipFile : lambda f: gzip.GzipFile(fileobj=f,mode='wb')
+}
+
 def read_excel(location, result):
     args = dict(
-        sheetname = result.value(setl.sheetname, default=Literal(0)).value,
+        sheet_name = result.value(setl.sheetname, default=Literal(0)).value,
         header = [int(x) for x in result.value(csvw.headerRow, default=Literal('0')).value.split(',')],
         skiprows = result.value(csvw.skipRows, default=Literal(0)).value
     )
     if result.value(csvw.header):
         args['header'] = [result.value(csvw.header).value]
-    with get_content(location, result) as f:
-        df = pandas.read_excel(f,encoding='utf-8', **args)
+    df = pandas.read_excel(location,encoding='utf-8', **args)
     return df
 
 def read_xml(location, result):
@@ -606,6 +633,8 @@ def json_transform(transform, resources):
             if run_samples and rowname >= 100:
                 break
             try:
+                root = None
+                data = None
                 root = {
                     "@id": generated.identifier,
                     "@graph": process_row(row, jslt, rowname, table, resources, transform, variables)
@@ -616,14 +645,16 @@ def json_transform(transform, resources):
                 #graph = ConjunctiveGraph(identifier=generated.identifier)
                 #graph.parse(data=json.dumps(root),format="json-ld")
                 data = json.dumps(root)
-                del root
+                #del root
                 result.parse(data=data, format="json-ld")
-                del data
+                #del data
                 after = len(result)
                 logger.debug("Row "+str(rowname)+" added "+str(after-before)+" triples.")
                 sys.stdout.flush()
             except Exception as e:
                 trace = sys.exc_info()[2]
+                if data is not None:
+                    logger.error("Error parsing tree: %s", data)
                 if isinstance(table, pandas.DataFrame):
                     logger.error("Error on %s %s", rowname, row)
                 else:
@@ -679,6 +710,13 @@ def transform(transform_resource, resources):
     for result in transform_graph.subjects(prov.wasGeneratedBy):
         graphs[result.identifier] = transform_graph
 
+def _load_open(generated):
+    filename = generated.identifier.replace("file://",'')
+    fh = open(filename, 'wb')
+    for type, pack in packers.items():
+        if generated[RDF.type : type]:
+            return pack(fh)
+    return fh
 
 def load(load_resource, resources):
     logger.info('Loading %s',load_resource.identifier)
@@ -712,7 +750,7 @@ def load(load_resource, resources):
             if fmt in formats:
                 fmt = formats[fmt]
                 #print fmt
-            with open(generated.identifier.replace("file://",''), 'wb') as o:
+            with _load_open(generated) as o:
                 o.write(file_graph.serialize(format=fmt))
                 o.close()
         elif generated[RDF.type:sd.Service]:
