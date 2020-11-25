@@ -10,8 +10,8 @@ def read(fname):
 
 setup(
     name = "setlr",
-    version = "0.2.15",
-    author = "Jim McCusker",
+    version = "0.2.16",
+    author = "Jamie McCusker",
     author_email = "mccusj@cs.rpi.edu",
     description = ("setlr is a tool for Semantic Extraction, Transformation, and Loading."),
     license = "Apache License 2.0",
