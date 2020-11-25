@@ -75,7 +75,7 @@ class LocalFileAdapter(requests.adapters.HTTPAdapter):
 requests_session = requests.session()
 requests_session.mount('file://', LocalFileAdapter())
 requests_session.mount('file:///', LocalFileAdapter())
-    
+
 datatypeConverters = collections.defaultdict(lambda: str)
 datatypeConverters.update({
     XSD.string: str,
@@ -101,6 +101,7 @@ def read_csv(location, result):
         sep = result.value(csvw.delimiter, default=Literal(",")).value,
         #header = result.value(csvw.headerRow, default=Literal(0)).value),
         skiprows = result.value(csvw.skipRows, default=Literal(0)).value,
+        dtype=str,
         # dtype = object    # Does not seem to play well with future and python2/3 conversion
     )
     if result.value(csvw.header):
@@ -108,7 +109,7 @@ def read_csv(location, result):
     df = pandas.read_csv(get_content(location, result),encoding='utf-8', **args)
     logger.debug("Loaded %s", location)
     return df
-        
+
 def read_graph(location, result, g = None):
     if g is None:
         g = ConjunctiveGraph()
@@ -162,7 +163,7 @@ class FileLikeFromIter(object):
 
 def _open_local_file(location):
     if location.startswith("file://"):
-        if os.name == 'nt': # skip the initial 
+        if os.name == 'nt': # skip the initial
             return open(location.replace('file:///','').replace('file://',''),'rb')
         else:
             return open(location.replace('file://',''),'rb')
@@ -171,7 +172,7 @@ content_handlers = [
     _open_local_file,
     lambda location: FileLikeFromIter(requests.get(location,stream=True).iter_content(1024*1024))
 ]
-        
+
 def get_content(location, result):
     response = None
     for handler in content_handlers:
@@ -180,7 +181,7 @@ def get_content(location, result):
             break
     if result[RDF.type:setl.Tempfile]:
         result = to_tempfile(response)
-        
+
     for t in result[RDF.type]:
         # Do we know how to unpack this?
         if t.identifier in unpackers:
@@ -234,7 +235,7 @@ def read_xml(location, result):
         for (i, (event, ele)) in enumerate(f.iterparse(fo)):
             yield i, ele
 
-             
+
 def read_json(location, result):
     selector = result.value(api_vocab.selector)
     if selector is not None:
@@ -243,7 +244,7 @@ def read_json(location, result):
         selector = ""
     with get_content(location, result) as fo:
         yield from enumerate(ijson.items(fo, selector))
-            
+
 
 extractors = {
     setl.XPORT : lambda location, result: pandas.read_sas(get_content(location, result), format='xport'),
@@ -257,14 +258,14 @@ extractors = {
     URIRef("https://www.iana.org/assignments/media-types/text/plain") : lambda location, result: get_content(location, result)
 }
 
-    
+
 try:
     from bs4 import BeautifulSoup
     extractors[setl.HTML] = lambda location, result: BeautifulSoup(get_content(location, result).read(), 'html.parser')
 except Exception as e:
     pass
-    
-    
+
+
 def load_csv(csv_resource):
     column_descriptions = {}
     for col in csv_resource[csvw.column]:
@@ -333,7 +334,7 @@ def create_python_function(f, resources):
         local_vars[name.value] = entity
     exec(script.value, local_vars, global_vars)
     resources[f.identifier] = global_vars['result']
-        
+
 def get_order(setl_graph):
     nodes = collections.defaultdict(set)
 
@@ -351,7 +352,7 @@ def get_order(setl_graph):
             for derivation in task[prov.qualifiedDerivation]:
                 derived = derivation.value(prov.entity)
                 nodes[task.identifier].add(derived.identifier)
-    
+
     return toposort_flatten(nodes)
 
 def extract(e, resources):
@@ -398,7 +399,7 @@ def get_template(templ):
         t = Template(templ)
         templates[templ] = t
     return templates[templ]
-    
+
 def process_row(row, template, rowname, table, resources, transform, variables):
     result = []
     e = {'row':row,
@@ -561,7 +562,7 @@ def json_transform(transform, resources):
         roleID  = role.value(dc.identifier)
         variables[roleID.value] = resources[used.identifier]
         #print "Using", used.identifier, "as", roleID.value
-    
+
     generated = list(transform.subjects(prov.wasGeneratedBy))[0]
     logger.info("Generating %s", generated.identifier)
 
@@ -628,7 +629,7 @@ def json_transform(transform, resources):
                 else:
                     logger.error("Error on %s", rowname)
                 raise e
-                
+
     resources[generated.identifier] = result
 
 def transform(transform_resource, resources):
@@ -639,12 +640,12 @@ def transform(transform_resource, resources):
         transform_graph = ConjunctiveGraph(identifier=result.identifier)
 
     used = set(transform_resource[prov.used])
-    
+
     for csv in [u for u in used if u[RDF.type:csvw.Table]]:
         csv_graph = Graph(store=transform_graph.store, identifier=csv)
         csv_graph += graphs[csv.identifier]
 
-    
+
     for script in [u for u in used if u[RDF.type:setl.PythonScript]]:
         logger.info("Script: %s", script.identifier)
         s = script.value(prov.value).value
@@ -663,22 +664,22 @@ def transform(transform_resource, resources):
         logger.info("Update: %s", update.identifier)
         query = update.value(prov.value).value
         transform_graph.update(query)
-        
+
     for construct in [u for u in used if u[RDF.type:sp.Construct]]:
         logger.info("Construct: %s", construct.identifier)
         query = construct.value(prov.value).value
         g = transform_graph.query(query)
         transform_graph += g
-        
+
     for csv in [u for u in used if u[RDF.type:csvw.Table]]:
         g = Graph(identifier=csv.identifier,store=transform_graph.store)
         g.remove((None, None, None))
         transform_graph.store.remove_graph(csv.identifier)
-            
+
     for result in transform_graph.subjects(prov.wasGeneratedBy):
         graphs[result.identifier] = transform_graph
 
-        
+
 def load(load_resource, resources):
     logger.info('Loading %s',load_resource.identifier)
     file_graph = Dataset(default_union=True)
@@ -723,8 +724,8 @@ def load(load_resource, resources):
             endpoint_graph.commit()
     #if to_disk:
     #    file_graph.close()
-    
-        
+
+
 actions = {
     setl.Extract : extract,
     setl.Transform : json_transform,
@@ -732,7 +733,7 @@ actions = {
     setl.PythonScript : create_python_function,
     setl.IsEmpty : isempty
 }
-            
+
 def _setl(setl_graph):
     global logger
     if logger is None:
@@ -758,7 +759,7 @@ def main():
 
     global logger
     logger = logging.getLogger(__name__)
-    
+
     global run_samples
     setl_file = args[0]
     if 'sample' in args:
