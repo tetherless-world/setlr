@@ -106,9 +106,10 @@ def read_csv(location, result):
     )
     if result.value(csvw.header):
         args['header'] = [0]
-    df = pandas.read_csv(location,encoding='utf-8', **args)
-    logger.debug("Loaded %s", location)
-    return df
+    with get_content(location, result) as fo:
+        df = pandas.read_csv(fo, encoding='utf-8', **args)
+        logger.debug("Loaded %s", location)
+        return df
 
 def read_graph(location, result, g = None):
     if g is None:
@@ -245,8 +246,9 @@ def read_excel(location, result):
     )
     if result.value(csvw.header):
         args['header'] = [result.value(csvw.header).value]
-    df = pandas.read_excel(location,encoding='utf-8', **args)
-    return df
+    with get_content(location, result) as fo:
+        df = pandas.read_excel(fo, encoding='utf-8', **args)
+        return df
 
 def read_xml(location, result):
     validate_dtd = False
