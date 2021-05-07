@@ -711,7 +711,12 @@ def transform(transform_resource, resources):
         graphs[result.identifier] = transform_graph
 
 def _load_open(generated):
-    filename = generated.identifier.replace("file://",'')
+    if generated.identifier.startswith("file://"):
+        if os.name == 'nt': # skip the initial
+            filename = generated.identifier.replace('file:///','').replace('file://','')
+        else:
+            filename = generated.identifier.replace('file://','')
+
     fh = open(filename, 'wb')
     for type, pack in packers.items():
         if generated[RDF.type : type]:
