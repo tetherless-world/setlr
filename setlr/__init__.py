@@ -36,6 +36,8 @@ import logging
 import hashlib
 from slugify import slugify
 
+from .trig_store import TrigStore
+
 def hash(value):
     m = hashlib.sha256()
     m.update(value.encode('utf-8'))
@@ -600,9 +602,10 @@ def json_transform(transform, resources):
     else:
         result = ConjunctiveGraph()
         if generated[RDF.type : setl.Persisted]:
-            result = ConjunctiveGraph(store="Sleepycat")
+            store = TrigStore()
+            result = ConjunctiveGraph(store=store)
         if generated[RDF.type : setl.Persisted]:
-            tempdir = tempfile.mkdtemp()
+            tempdir = tempfile.mktemp()
             logger.info("Persisting %s to %s", generated.identifier, tempdir)
             result.store.open(tempdir, True)
     s = transform.value(prov.value).value
@@ -643,15 +646,15 @@ def json_transform(transform, resources):
                 }
                 if context is not None:
                     root['@context'] = context
-                before = len(result)
+                #before = len(result)
                 #graph = ConjunctiveGraph(identifier=generated.identifier)
                 #graph.parse(data=json.dumps(root),format="json-ld")
                 data = json.dumps(root)
                 #del root
                 result.parse(data=data, format="json-ld")
                 #del data
-                after = len(result)
-                logger.debug("Row "+str(rowname)+" added "+str(after-before)+" triples.")
+                #after = len(result)
+                logger.debug("Row "+str(rowname))#+" added "+str(after-before)+" triples.")
                 sys.stdout.flush()
             except Exception as e:
                 trace = sys.exc_info()[2]
@@ -758,8 +761,8 @@ def load(load_resource, resources):
                 fmt = formats[fmt]
                 #print fmt
             with _load_open(generated) as o:
-                o.write(file_graph.serialize(format=fmt))
-                o.close()
+                file_graph.serialize(o, format=fmt)
+                
         elif generated[RDF.type:sd.Service]:
             from rdflib.plugins.stores.sparqlstore import SPARQLUpdateStore
             endpoint = generated.value(sd.endpoint, default=generated).identifier
