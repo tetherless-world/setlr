@@ -416,9 +416,11 @@ def clone(value):
 
 functions = {}
 def get_function(expr, local_keys):
-    key = tuple([expr]+sorted(local_keys))
+    used_local_keys = [k for k in local_keys if k in expr]
+    key = tuple([expr]+sorted(used_local_keys))
     if key not in functions:
-        script = '''lambda %s: %s'''% (', '.join(sorted(local_keys)), expr)
+        script = '''lambda %s,**kwargs: %s'''% (', '.join(sorted(used_local_keys)), expr)
+        #print(script)
         fn = eval(script)
         fn.__name__ = expr.encode("ascii", "ignore").decode('utf8')
         functions[key] = fn
@@ -430,6 +432,23 @@ def get_template(templ):
         t = Template(templ)
         templates[templ] = t
     return templates[templ]
+
+def flatten_lists(o):
+    if isinstance(o, list):
+        result = []
+        for x in o:
+            flattened = flatten_lists(x)
+            if isinstance(flattened, list):
+                result.extend(flattened)
+            else:
+                result.append(flattened)
+        return result
+    elif isinstance(o, dict):
+        for key in o.keys():
+            o[key] = flatten_lists(o[key])
+        return o
+    else:
+        return o
 
 def process_row(row, template, rowname, table, resources, transform, variables):
     result = []
@@ -534,7 +553,9 @@ def process_row(row, template, rowname, table, resources, transform, variables):
                     fn = get_function(expression, list(env.keys()))
                     v = fn(**env)
                     if v is not None:
-                        if len(variable_list) == 1:
+                        if len(variable_list) == 1 and not (
+                                isinstance(v, collections.Iterable)
+                                and not isinstance(v, str)):
                             v = [v]
                         new_env = dict(env)
                         for i, variable in enumerate(variable_list):
@@ -581,7 +602,8 @@ def process_row(row, template, rowname, table, resources, transform, variables):
             parent[key] = this
         else:
             parent.append(this)
-    return result
+
+    return flatten_lists(result)
 
 def json_transform(transform, resources):
     logger.info("Transforming %s", transform.identifier)
@@ -646,6 +668,7 @@ def json_transform(transform, resources):
                 }
                 if context is not None:
                     root['@context'] = context
+                #logger.debug(json.dumps(root, indent=4))
                 #before = len(result)
                 #graph = ConjunctiveGraph(identifier=generated.identifier)
                 #graph.parse(data=json.dumps(root),format="json-ld")
@@ -762,7 +785,7 @@ def load(load_resource, resources):
                 #print fmt
             with _load_open(generated) as o:
                 file_graph.serialize(o, format=fmt)
-                
+
         elif generated[RDF.type:sd.Service]:
             from rdflib.plugins.stores.sparqlstore import SPARQLUpdateStore
             endpoint = generated.value(sd.endpoint, default=generated).identifier
