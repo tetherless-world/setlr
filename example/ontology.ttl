@@ -1,0 +1,271 @@
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+
+prov:Association a owl:Class ;
+    rdfs:label "Association" ;
+    rdfs:subClassOf prov:AgentInfluence ;
+    skos:definition "An instance of prov:Association provides additional descriptions about the binary prov:wasAssociatedWith relation from an prov:Activity to some prov:Agent that had some responsiblity for it. For example, :baking prov:wasAssociatedWith :baker; prov:qualifiedAssociation [ a prov:Association; prov:agent :baker; :foo :bar ]. " .
+
+prov:Attribution a owl:Class ;
+    rdfs:label "Attribution" ;
+    rdfs:subClassOf prov:AgentInfluence ;
+    skos:definition "An instance of prov:Attribution provides additional descriptions about the binary prov:wasAttributedTo relation from an prov:Entity to some prov:Agent that had some responsible for it. For example, :cake prov:wasAttributedTo :baker; prov:qualifiedAttribution [ a prov:Attribution; prov:entity :baker; :foo :bar ]. " .
+
+prov:Bundle a owl:Class ;
+    rdfs:label "Bundle" ;
+    rdfs:subClassOf prov:Entity ;
+    skos:definition "Note that there are kinds of bundles (e.g. handwritten letters, audio recordings, etc.) that are not expressed in PROV-O, but can be still be described by PROV-O. " .
+
+prov:Communication a owl:Class ;
+    rdfs:label "Communication" ;
+    rdfs:subClassOf prov:ActivityInfluence ;
+    skos:definition "An instance of prov:Communication provides additional descriptions about the binary prov:wasInformedBy relation from an informed prov:Activity to the prov:Activity that informed it. For example, :you_jumping_off_bridge prov:wasInformedBy :everyone_else_jumping_off_bridge; prov:qualifiedCommunication [ a prov:Communication; prov:activity :everyone_else_jumping_off_bridge; :foo :bar ]. " .
+
+prov:Delegation a owl:Class ;
+    rdfs:label "Delegation" ;
+    rdfs:subClassOf prov:AgentInfluence ;
+    skos:definition "An instance of prov:Delegation provides additional descriptions about the binary prov:actedOnBehalfOf relation from a performing prov:Agent to some prov:Agent for whom it was performed. For example, :mixing prov:wasAssociatedWith :toddler . :toddler prov:actedOnBehalfOf :mother; prov:qualifiedDelegation [ a prov:Delegation; prov:entity :mother; :foo :bar ]. " .
+
+prov:End a owl:Class ;
+    rdfs:label "End" ;
+    rdfs:subClassOf prov:EntityInfluence,
+        prov:InstantaneousEvent ;
+    skos:definition "An instance of prov:End provides additional descriptions about the binary prov:wasEndedBy relation from some ended prov:Activity to an prov:Entity that ended it. For example, :ball_game prov:wasEndedBy :buzzer; prov:qualifiedEnd [ a prov:End; prov:entity :buzzer; :foo :bar; prov:atTime '2012-03-09T08:05:08-05:00'^^xsd:dateTime ]. " .
+
+prov:Generation a owl:Class ;
+    rdfs:label "Generation" ;
+    rdfs:subClassOf prov:ActivityInfluence,
+        prov:InstantaneousEvent ;
+    skos:definition "An instance of prov:Generation provides additional descriptions about the binary prov:wasGeneratedBy relation from a generated prov:Entity to the prov:Activity that generated it. For example, :cake prov:wasGeneratedBy :baking; prov:qualifiedGeneration [ a prov:Generation; prov:activity :baking; :foo :bar ]. " .
+
+prov:Invalidation a owl:Class ;
+    rdfs:label "Invalidation" ;
+    rdfs:subClassOf prov:ActivityInfluence,
+        prov:InstantaneousEvent ;
+    skos:definition "An instance of prov:Invalidation provides additional descriptions about the binary prov:wasInvalidatedBy relation from an invalidated prov:Entity to the prov:Activity that invalidated it. For example, :uncracked_egg prov:wasInvalidatedBy :baking; prov:qualifiedInvalidation [ a prov:Invalidation; prov:activity :baking; :foo :bar ]. " .
+
+prov:Plan a owl:Class ;
+    rdfs:label "Plan" ;
+    rdfs:subClassOf prov:Entity ;
+    skos:definition "There exist no prescriptive requirement on the nature of plans, their representation, the actions or steps they consist of, or their intended goals. Since plans may evolve over time, it may become necessary to track their provenance, so plans themselves are entities. Representing the plan explicitly in the provenance can be useful for various tasks: for example, to validate the execution as represented in the provenance record, to manage expectation failures, or to provide explanations. " .
+
+prov:PrimarySource a owl:Class ;
+    rdfs:label "PrimarySource" ;
+    rdfs:subClassOf prov:Derivation ;
+    skos:definition "An instance of prov:PrimarySource provides additional descriptions about the binary prov:hadPrimarySource relation from some secondary prov:Entity to an earlier, primary prov:Entity. For example, :blog prov:hadPrimarySource :newsArticle; prov:qualifiedPrimarySource [ a prov:PrimarySource; prov:entity :newsArticle; :foo :bar ] . " .
+
+prov:Quotation a owl:Class ;
+    rdfs:label "Quotation" ;
+    rdfs:subClassOf prov:Derivation ;
+    skos:definition "An instance of prov:Quotation provides additional descriptions about the binary prov:wasQuotedFrom relation from some taken prov:Entity from an earlier, larger prov:Entity. For example, :here_is_looking_at_you_kid prov:wasQuotedFrom :casablanca_script; prov:qualifiedQuotation [ a prov:Quotation; prov:entity :casablanca_script; :foo :bar ]. " .
+
+prov:Start a owl:Class ;
+    rdfs:label "Start" ;
+    rdfs:subClassOf prov:EntityInfluence,
+        prov:InstantaneousEvent ;
+    skos:definition "An instance of prov:Start provides additional descriptions about the binary prov:wasStartedBy relation from some started prov:Activity to an prov:Entity that started it. For example, :foot_race prov:wasStartedBy :bang; prov:qualifiedStart [ a prov:Start; prov:entity :bang; :foo :bar; prov:atTime '2012-03-09T08:05:08-05:00'^^xsd:dateTime ] . " .
+
+prov:Usage a owl:Class ;
+    rdfs:label "Usage" ;
+    rdfs:subClassOf prov:EntityInfluence,
+        prov:InstantaneousEvent ;
+    skos:definition "An instance of prov:Usage provides additional descriptions about the binary prov:used relation from some prov:Activity to an prov:Entity that it used. For example, :keynote prov:used :podium; prov:qualifiedUsage [ a prov:Usage; prov:entity :podium; :foo :bar ]. " .
+
+prov:actedOnBehalfOf a owl:ObjectProperty ;
+    rdfs:label "actedOnBehalfOf" ;
+    skos:definition "An object property to express the accountability of an agent towards another agent. The subordinate agent acted on behalf of the responsible agent in an actual activity. " .
+
+prov:atLocation a owl:ObjectProperty ;
+    rdfs:label "atLocation" ;
+    skos:definition "The Location of any resource.",
+        "This property has multiple RDFS domains to suit multiple OWL Profiles. See <a href=\"#owl-profile\">PROV-O OWL Profile</a>. " .
+
+prov:atTime a owl:DatatypeProperty ;
+    rdfs:label "atTime" ;
+    skos:definition "The time at which an InstantaneousEvent occurred, in the form of xsd:dateTime. " .
+
+prov:endedAtTime a owl:DatatypeProperty ;
+    rdfs:label "endedAtTime" ;
+    skos:definition "The time at which an activity ended. See also prov:startedAtTime." .
+
+prov:generatedAtTime a owl:DatatypeProperty ;
+    rdfs:label "generatedAtTime" ;
+    skos:definition "The time at which an entity was completely created and is available for use." .
+
+prov:hadActivity a owl:ObjectProperty ;
+    rdfs:label "hadActivity" ;
+    skos:definition "The _optional_ Activity of an Influence, which used, generated, invalidated, or was the responsibility of some Entity. This property is _not_ used by ActivityInfluence (use prov:activity instead). ",
+        "This property has multiple RDFS domains to suit multiple OWL Profiles. See <a href=\"#owl-profile\">PROV-O OWL Profile</a>. " .
+
+prov:hadGeneration a owl:ObjectProperty ;
+    rdfs:label "hadGeneration" ;
+    skos:definition "The _optional_ Generation involved in an Entity's Derivation." .
+
+prov:hadPlan a owl:ObjectProperty ;
+    rdfs:label "hadPlan" ;
+    skos:definition "The _optional_ Plan adopted by an Agent in Association with some Activity. Plan specifications are out of the scope of this specification." .
+
+prov:hadRole a owl:ObjectProperty ;
+    rdfs:label "hadRole" ;
+    skos:definition "The _optional_ Role that an Entity assumed in the context of an Activity. For example, :baking prov:used :spoon; prov:qualified [ a prov:Usage; prov:entity :spoon; prov:hadRole roles:mixing_implement ]. ",
+        "This property has multiple RDFS domains to suit multiple OWL Profiles. See <a href=\"#owl-profile\">PROV-O OWL Profile</a>. " .
+
+prov:hadUsage a owl:ObjectProperty ;
+    rdfs:label "hadUsage" ;
+    skos:definition "The _optional_ Usage involved in an Entity's Derivation." .
+
+prov:influencer a owl:ObjectProperty ;
+    rdfs:label "influencer" ;
+    skos:definition "Subproperties of prov:influencer are used to cite the object of an unqualified PROV-O triple whose predicate is a subproperty of prov:wasInfluencedBy (e.g. prov:used, prov:wasGeneratedBy). prov:influencer is used much like rdf:object is used. " .
+
+prov:invalidatedAtTime a owl:DatatypeProperty ;
+    rdfs:label "invalidatedAtTime" ;
+    skos:definition "The time at which an entity was invalidated (i.e., no longer usable). " .
+
+prov:qualifiedAssociation a owl:ObjectProperty ;
+    rdfs:label "qualifiedAssociation" ;
+    skos:definition "If this Activity prov:wasAssociatedWith Agent :ag, then it can qualify the Association using prov:qualifiedAssociation [ a prov:Association;  prov:agent :ag; :foo :bar ]. " .
+
+prov:qualifiedAttribution a owl:ObjectProperty ;
+    rdfs:label "qualifiedAttribution" ;
+    skos:definition "If this Entity prov:wasAttributedTo Agent :ag, then it can qualify how it was influenced using prov:qualifiedAttribution [ a prov:Attribution;  prov:agent :ag; :foo :bar ]. " .
+
+prov:qualifiedCommunication a owl:ObjectProperty ;
+    rdfs:label "qualifiedCommunication" ;
+    skos:definition "If this Activity prov:wasInformedBy Activity :a, then it can qualify how it was influenced using prov:qualifiedCommunication [ a prov:Communication;  prov:activity :a; :foo :bar ]. " .
+
+prov:qualifiedDelegation a owl:ObjectProperty ;
+    rdfs:label "qualifiedDelegation" ;
+    skos:definition "If this Agent prov:actedOnBehalfOf Agent :ag, then it can qualify how with prov:qualifiedResponsibility [ a prov:Responsibility;  prov:agent :ag; :foo :bar ]. " .
+
+prov:qualifiedDerivation a owl:ObjectProperty ;
+    rdfs:label "qualifiedDerivation" ;
+    skos:definition "If this Entity prov:wasDerivedFrom Entity :e, then it can qualify how it was derived using prov:qualifiedDerivation [ a prov:Derivation;  prov:entity :e; :foo :bar ]. " .
+
+prov:qualifiedEnd a owl:ObjectProperty ;
+    rdfs:label "qualifiedEnd" ;
+    skos:definition "If this Activity prov:wasEndedBy Entity :e1, then it can qualify how it was ended using prov:qualifiedEnd [ a prov:End;  prov:entity :e1; :foo :bar ]. " .
+
+prov:qualifiedGeneration a owl:ObjectProperty ;
+    rdfs:label "qualifiedGeneration" ;
+    skos:definition "If this Activity prov:generated Entity :e, then it can qualify how it performed the Generation using prov:qualifiedGeneration [ a prov:Generation;  prov:entity :e; :foo :bar ]. " .
+
+prov:qualifiedInfluence a owl:ObjectProperty ;
+    rdfs:label "qualifiedInfluence" ;
+    skos:definition "Because prov:qualifiedInfluence is a broad relation, the more specific relations (qualifiedCommunication, qualifiedDelegation, qualifiedEnd, etc.) should be used when applicable. " .
+
+prov:qualifiedInvalidation a owl:ObjectProperty ;
+    rdfs:label "qualifiedInvalidation" ;
+    skos:definition "If this Entity prov:wasInvalidatedBy Activity :a, then it can qualify how it was invalidated using prov:qualifiedInvalidation [ a prov:Invalidation;  prov:activity :a; :foo :bar ]. " .
+
+prov:qualifiedPrimarySource a owl:ObjectProperty ;
+    rdfs:label "qualifiedPrimarySource" ;
+    skos:definition "If this Entity prov:hadPrimarySource Entity :e, then it can qualify how using prov:qualifiedPrimarySource [ a prov:PrimarySource; prov:entity :e; :foo :bar ]. " .
+
+prov:qualifiedQuotation a owl:ObjectProperty ;
+    rdfs:label "qualifiedQuotation" ;
+    skos:definition "If this Entity prov:wasQuotedFrom Entity :e, then it can qualify how using prov:qualifiedQuotation [ a prov:Quotation;  prov:entity :e; :foo :bar ]. " .
+
+prov:qualifiedRevision a owl:ObjectProperty ;
+    rdfs:label "qualifiedRevision" ;
+    skos:definition "If this Entity prov:wasRevisionOf Entity :e, then it can qualify how it was revised using prov:qualifiedRevision [ a prov:Revision;  prov:entity :e; :foo :bar ]. " .
+
+prov:qualifiedStart a owl:ObjectProperty ;
+    rdfs:label "qualifiedStart" ;
+    skos:definition "If this Activity prov:wasStartedBy Entity :e1, then it can qualify how it was started using prov:qualifiedStart [ a prov:Start;  prov:entity :e1; :foo :bar ]. " .
+
+prov:qualifiedUsage a owl:ObjectProperty ;
+    rdfs:label "qualifiedUsage" ;
+    skos:definition "If this Activity prov:used Entity :e, then it can qualify how it used it using prov:qualifiedUsage [ a prov:Usage; prov:entity :e; :foo :bar ]. " .
+
+prov:startedAtTime a owl:DatatypeProperty ;
+    rdfs:label "startedAtTime" ;
+    skos:definition "The time at which an activity started. See also prov:endedAtTime." .
+
+prov:used a owl:ObjectProperty ;
+    rdfs:label "used" ;
+    skos:definition "A prov:Entity that was used by this prov:Activity. For example, :baking prov:used :spoon, :egg, :oven . " .
+
+prov:wasAssociatedWith a owl:ObjectProperty ;
+    rdfs:label "wasAssociatedWith" ;
+    skos:definition "An prov:Agent that had some (unspecified) responsibility for the occurrence of this prov:Activity." .
+
+prov:wasAttributedTo a owl:ObjectProperty ;
+    rdfs:label "wasAttributedTo" ;
+    skos:definition "Attribution is the ascribing of an entity to an agent." .
+
+prov:wasDerivedFrom a owl:ObjectProperty ;
+    rdfs:label "wasDerivedFrom" ;
+    skos:definition "The more specific subproperties of prov:wasDerivedFrom (i.e., prov:wasQuotedFrom, prov:wasRevisionOf, prov:hadPrimarySource) should be used when applicable. " .
+
+prov:wasEndedBy a owl:ObjectProperty ;
+    rdfs:label "wasEndedBy" ;
+    skos:definition "End is when an activity is deemed to have ended. An end may refer to an entity, known as trigger, that terminated the activity. " .
+
+prov:wasInfluencedBy a owl:ObjectProperty ;
+    rdfs:label "wasInfluencedBy" ;
+    skos:definition "Because prov:wasInfluencedBy is a broad relation, its more specific subproperties (e.g. prov:wasInformedBy, prov:actedOnBehalfOf, prov:wasEndedBy, etc.) should be used when applicable. ",
+        "This property has multiple RDFS domains to suit multiple OWL Profiles. See <a href=\"#owl-profile\">PROV-O OWL Profile</a>. " .
+
+prov:wasInformedBy a owl:ObjectProperty ;
+    rdfs:label "wasInformedBy" ;
+    skos:definition "An activity a2 is dependent on or informed by another activity a1, by way of some unspecified entity that is generated by a1 and used by a2. " .
+
+prov:wasQuotedFrom a owl:ObjectProperty ;
+    rdfs:label "wasQuotedFrom" ;
+    skos:definition "An entity is derived from an original entity by copying, or 'quoting', some or all of it. " .
+
+prov:wasRevisionOf a owl:AnnotationProperty,
+        owl:ObjectProperty ;
+    rdfs:label "wasRevisionOf" ;
+    skos:definition "A revision is a derivation that revises an entity into a revised version." .
+
+prov:wasStartedBy a owl:ObjectProperty ;
+    rdfs:label "wasStartedBy" ;
+    skos:definition "Start is when an activity is deemed to have started. A start may refer to an entity, known as trigger, that initiated the activity. " .
+
+<http://www.w3.org/ns/prov-o#> a owl:Ontology ;
+    rdfs:label "W3C PROVenance Interchange Ontology (PROV-O)" ;
+    skos:definition "This document is published by the Provenance Working Group (http://www.w3.org/2011/prov/wiki/Main_Page). If you wish to make comments regarding this document, please send them to public-prov-comments@w3.org (subscribe public-prov-comments-request@w3.org, archives http://lists.w3.org/Archives/Public/public-prov-comments/). All feedback is welcome. " .
+
+<prov:Revision> a owl:Class ;
+    rdfs:label "Revision" ;
+    rdfs:subClassOf prov:Derivation ;
+    skos:definition "An instance of prov:Revision proides additional descriptions about the binary prov:wasRevisionOf relation from some newer prov:Entity to an earlier prov:Entity. For example, :draft_2 prov:wasRevisionOf :draft_1; prov:qualifiedRevision [ a prov:Revision; prov:entity :draft_1; :foo :bar ]. " .
+
+prov:ActivityInfluence a owl:Class ;
+    rdfs:label "ActivityInfluence" ;
+    rdfs:subClassOf <file:///Users/jamie/src/setlr/example/b0>,
+        prov:Influence ;
+    skos:definition "ActivityInfluence provides additional descriptions of an Activity's binary influence upon any other kind of resource. Instances of ActivityInfluence use the prov:activity property to cite the influencing Activity.",
+        "It is not recommended that the type ActivityInfluence be asserted without also asserting one of its more specific subclasses." .
+
+prov:AgentInfluence a owl:Class ;
+    rdfs:label "AgentInfluence" ;
+    rdfs:subClassOf prov:Influence ;
+    skos:definition "AgentInfluence provides additional descriptions of an Agent's binary influence upon any other kind of resource. Instances of AgentInfluence use the prov:agent property to cite the influencing Agent.",
+        "It is not recommended that the type AgentInfluence be asserted without also asserting one of its more specific subclasses." .
+
+prov:Derivation a owl:Class ;
+    rdfs:label "Derivation" ;
+    rdfs:subClassOf prov:EntityInfluence ;
+    skos:definition "An instance of prov:Derivation provides additional descriptions about the binary prov:wasDerivedFrom relation from some derived prov:Entity to another prov:Entity from which it was derived. For example, :chewed_bubble_gum prov:wasDerivedFrom :unwrapped_bubble_gum; prov:qualifiedDerivation [ a prov:Derivation; prov:entity :unwrapped_bubble_gum; :foo :bar ]. ",
+        "The more specific forms of prov:Derivation (i.e., prov:Revision, prov:Quotation, prov:PrimarySource) should be asserted if they apply. " .
+
+prov:Influence a owl:Class ;
+    rdfs:label "Influence" ;
+    skos:definition "An instance of prov:Influence provides additional descriptions about the binary prov:wasInfluencedBy relation from some influenced Activity, Entity, or Agent to the influencing Activity, Entity, or Agent. For example, :stomach_ache prov:wasInfluencedBy :spoon; prov:qualifiedInfluence [ a prov:Influence; prov:entity :spoon; :foo :bar ] . Because prov:Influence is a broad relation, the more specific relations (Communication, Delegation, End, etc.) should be used when applicable. ",
+        "Because prov:Influence is a broad relation, its most specific subclasses (e.g. prov:Communication, prov:Delegation, prov:End, prov:Revision, etc.) should be used when applicable. " .
+
+prov:EntityInfluence a owl:Class ;
+    rdfs:label "EntityInfluence" ;
+    rdfs:subClassOf prov:Influence ;
+    skos:definition "EntityInfluence provides additional descriptions of an Entity's binary influence upon any other kind of resource. Instances of EntityInfluence use the prov:entity property to cite the influencing Entity.",
+        "It is not recommended that the type EntityInfluence be asserted without also asserting one of its more specific subclasses." .
+
+prov:InstantaneousEvent a owl:Class ;
+    rdfs:label "InstantaneousEvent" ;
+    skos:definition "An instantaneous event, or event for short, happens in the world and marks a change in the world, in its activities and in its entities. The term 'event' is commonly used in process algebra with a similar meaning. Events represent communications or interactions; they are assumed to be atomic and instantaneous. " .
+

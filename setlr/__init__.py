@@ -33,8 +33,11 @@ import gzip
 
 import logging
 
+from tqdm import tqdm
+
 import hashlib
 from slugify import slugify
+from pyshacl import validate
 
 from .trig_store import TrigStore
 
@@ -52,6 +55,7 @@ sp = Namespace('http://spinrdf.org/sp#')
 sd = Namespace('http://www.w3.org/ns/sparql-service-description#')
 dc = Namespace('http://purl.org/dc/terms/')
 void = Namespace('http://rdfs.org/ns/void#')
+shacl = Namespace('http://www.w3.org/ns/shacl#')
 api_vocab = Namespace('http://purl.org/linked-data/api/vocab#')
 
 sys.setrecursionlimit(10000)
@@ -87,7 +91,7 @@ datatypeConverters.update({
     XSD.double: float
 })
 
-run_samples = False
+run_samples = -1
 
 _rdf_formats_to_guess = [
     'xml',
@@ -110,7 +114,7 @@ def read_csv(location, result):
         args['header'] = [0]
     with get_content(location, result) as fo:
         df = pandas.read_csv(fo, encoding='utf-8', **args)
-        logger.debug("Loaded %s", location)
+        #logger.debug("Loaded %s", location)
         return df
 
 def read_graph(location, result, g = None):
@@ -263,7 +267,7 @@ def read_xml(location, result):
     for xp in result[setl.xpath]:
         f.iter_end(xp.value)
     with get_content(location, result) as fo:
-        for (i, (event, ele)) in enumerate(f.iterparse(fo)):
+        for (i, (event, ele)) in enumerate(tqdm(f.iterparse(fo))):
             yield i, ele
 
 
@@ -274,7 +278,7 @@ def read_json(location, result):
     else:
         selector = ""
     with get_content(location, result) as fo:
-        yield from enumerate(ijson.items(fo, selector))
+        yield from enumerate(tqdm(ijson.items(fo, selector)))
 
 
 extractors = {
@@ -387,7 +391,7 @@ def get_order(setl_graph):
     return toposort_flatten(nodes)
 
 def extract(e, resources):
-    logger.info('Extracting %s',e.identifier)
+    logger.info('Extract %s',e.identifier)
     used = e.value(prov.used)
     for result in e.subjects(prov.wasGeneratedBy):
         if used is None:
@@ -395,7 +399,7 @@ def extract(e, resources):
         for t in result[RDF.type]:
             # Do we know how to generate this?
             if t.identifier in extractors:
-                logger.info("Extracted %s", used.identifier)
+                logger.info("Using %s", used.identifier)
                 resources[result.identifier] = extractors[t.identifier](used.identifier, result)
                 return resources[result.identifier]
 
@@ -606,7 +610,7 @@ def process_row(row, template, rowname, table, resources, transform, variables):
     return flatten_lists(result)
 
 def json_transform(transform, resources):
-    logger.info("Transforming %s", transform.identifier)
+    logger.info("Transform %s", transform.identifier)
     tables = [u for u in transform[prov.used]]
     variables = {}
     for usage in transform[prov.qualifiedUsage]:
@@ -619,6 +623,20 @@ def json_transform(transform, resources):
     generated = list(transform.subjects(prov.wasGeneratedBy))[0]
     logger.info("Generating %s", generated.identifier)
 
+    connected_downstream_graph = '''
+construct {
+   ?target ?p ?o
+} where {
+   ?source (<>|!<>)* ?target.
+   ?target ?p ?o.
+}
+'''
+    shape_graph = Graph()
+    for shape in transform.objects(dc.conformsTo):
+        if shape[RDF.type:shacl.NodeShape] or shape[RDF.type:shacl.PropertyShape]:
+            logger.info("Validating against SHACL shape %s", shape.identifier)
+            shape_graph += transform.graph.query(connected_downstream_graph,
+                                                 initBindings={"source":shape.identifier})
     if generated.identifier in resources:
         result = resources[generated.identifier]
     else:
@@ -652,12 +670,12 @@ def json_transform(transform, resources):
         if isinstance(table, pandas.DataFrame):
             #if run_samples:
             #    table = table.head()
-            it = table.iterrows()
-            logger.info("Transforming %s rows.", len(table.index))
+            it = tqdm(table.iterrows(), total=table.shape[0])
+            #logger.info("Transforming %s rows.", len(table.index))
         else:
-            logger.info("Transforming %s", t.identifier)
+            logger.info("Transform %s", t.identifier)
         for rowname, row in it:
-            if run_samples and rowname >= 100:
+            if run_samples > 0 and rowname >= run_samples:
                 break
             try:
                 root = None
@@ -668,17 +686,28 @@ def json_transform(transform, resources):
                 }
                 if context is not None:
                     root['@context'] = context
+
                 #logger.debug(json.dumps(root, indent=4))
                 #before = len(result)
                 #graph = ConjunctiveGraph(identifier=generated.identifier)
                 #graph.parse(data=json.dumps(root),format="json-ld")
                 data = json.dumps(root)
                 #del root
+                
+                if len(shape_graph) > 0:
+                    d = ConjunctiveGraph()
+                    d.parse(data=data,format='json-ld')
+                    conforms, report, message = validate(d,
+                                                         shacl_graph=shape_graph,
+                                                         advanced=True,
+                                                         debug=False)
+                    if not conforms:
+                        print(message)
                 result.parse(data=data, format="json-ld")
                 #del data
                 #after = len(result)
-                logger.debug("Row "+str(rowname))#+" added "+str(after-before)+" triples.")
-                sys.stdout.flush()
+                #logger.debug("Row "+str(rowname))#+" added "+str(after-before)+" triples.")
+                #sys.stdout.flush()
             except Exception as e:
                 trace = sys.exc_info()[2]
                 if data is not None:
@@ -752,7 +781,7 @@ def _load_open(generated):
     return fh
 
 def load(load_resource, resources):
-    logger.info('Loading %s',load_resource.identifier)
+    logger.info('Load %s',load_resource.identifier)
     file_graph = Dataset(default_union=True)
     to_disk = False
     for used in load_resource[prov.used]:
@@ -821,10 +850,16 @@ def _setl(setl_graph):
     return resources
 logger = None
 
-def main():
-    args = sys.argv[1:]
+import click
+@click.command()
+@click.option('--quiet', '-q', is_flag=True, default=False, help="Minimize logging.")
+@click.option('-n', default=-1, help="Only process the first N rows.", type=int)
+#@click.option('--rdf-validation', default=None, help="Save the RDF validation report to this file.")
+#@click.option('--text-validation', default=None, help="Save the text validation report to this file.")
+@click.argument('script', type=click.Path(exists=True))
+def main(script, rdf_validation=None, text_validation=None, quiet=False, n=-1):
     logging_level = logging.DEBUG
-    if '-q' in args or '--quiet' in args:
+    if quiet:
         logging_level = logging.WARNING
     logging.basicConfig(level=logging_level)
 
@@ -832,18 +867,9 @@ def main():
     logger = logging.getLogger(__name__)
 
     global run_samples
-    setl_file = args[0]
-    if 'sample' in args:
-        run_samples = True
-        logger.warning("Only processing a few sample rows.")
+    run_samples = n
     setl_graph = ConjunctiveGraph()
-    content = open(setl_file).read()
+    content = open(script).read()
     setl_graph.parse(data=content, format="turtle")
 
     graphs = _setl(setl_graph)
-#    print "Finished processing"
-#    return graphs
-
-if __name__ == '__main__':
-    result = main()
-    logger.info("Exiting")

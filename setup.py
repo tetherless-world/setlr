@@ -1,5 +1,6 @@
 import os
 from setuptools import setup, find_packages
+from setlr._version import __version__
 
 # Utility function to read the README file.
 # Used for the long_description.  It's nice, because now 1) we have a top level
@@ -10,7 +11,7 @@ def read(fname):
 
 setup(
     name = "setlr",
-    version = "0.2.19",
+    version = __version__,
     author = "Jamie McCusker",
     author_email = "mccusj@cs.rpi.edu",
     description = ("setlr is a tool for Semantic Extraction, Transformation, and Loading."),
@@ -35,8 +36,11 @@ setup(
         'six',
         'xlrd',
         'ijson',
+        'click',
+        'tqdm',
         'requests-testadapter',
         'python-slugify',
+        'pyshacl[js]'
     ],
     entry_points = {
         'console_scripts': ['setlr=setlr:main'],

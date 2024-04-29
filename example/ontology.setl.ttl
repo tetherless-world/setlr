@@ -1,0 +1,143 @@
+@prefix prov:          <http://www.w3.org/ns/prov#> .
+@prefix dcat:          <http://www.w3.org/ns/dcat#> .
+@prefix dcterms:       <http://purl.org/dc/terms/> .
+@prefix void:          <http://rdfs.org/ns/void#> .
+@prefix setl:          <http://purl.org/twc/vocab/setl/> .
+@prefix csvw:          <http://www.w3.org/ns/csvw#> .
+@prefix pv:            <http://purl.org/net/provenance/ns#> .
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix :              <http://example.org/setl/> .
+
+:table a csvw:Table, setl:Table;
+  csvw:delimiter ",";
+  prov:wasGeneratedBy [
+    a setl:Extract;
+    prov:used <ontology.csv>;
+  ].
+
+
+<http://example.org/shacl4owl/Class> a sh:NodeShape ;
+    sh:targetClass owl:Class ;
+    sh:property [
+        sh:path rdfs:label ;
+        sh:nodeKind sh:Literal ;
+        sh:uniqueLang true ;
+        sh:minCount 1 ;
+    ], [
+        sh:path skos:definition ;
+        sh:nodeKind sh:Literal ;
+        sh:uniqueLang true ;
+        sh:minCount 1 ;
+    ], [
+        sh:path rdfs:subClassOf ;
+        sh:nodeKind sh:IRI ;
+        sh:minCount 1 ;
+    ], [
+        sh:path rdfs:subPropertyOf ;
+        sh:nodeKind sh:IRI ;
+        sh:maxCount 0 ;
+    ].
+
+<http://example.org/shacl4owl/ObjectProperty> a sh:NodeShape ;
+    sh:targetClass owl:ObjectProperty ;
+    sh:property [
+        sh:path rdfs:label ;
+        sh:nodeKind sh:Literal ;
+        sh:uniqueLang true ;
+        sh:minCount 1 ;
+    ], [
+        sh:path skos:definition ;
+        sh:nodeKind sh:Literal ;
+        sh:uniqueLang true ;
+        sh:minCount 1 ;
+    ], [
+        sh:path rdfs:subPropertyOf ;
+        sh:nodeKind sh:IRI ;
+        sh:minCount 0 ;
+    ], [
+        sh:path rdfs:subClassOf ;
+        sh:nodeKind sh:IRI ;
+        sh:maxCount 0 ;
+    ].
+
+
+<http://example.org/shacl4owl/DatatypeProperty> a sh:NodeShape ;
+    sh:targetClass owl:DatatypeProperty ;
+    sh:property [
+        sh:path rdfs:label ;
+        sh:nodeKind sh:Literal ;
+        sh:uniqueLang true ;
+        sh:minCount 1 ;
+    ], [
+        sh:path skos:definition ;
+        sh:nodeKind sh:Literal ;
+        sh:uniqueLang true ;
+        sh:minCount 1 ;
+    ], [
+    sh:path rdfs:subPropertyOf ;
+        sh:nodeKind sh:IRI ;
+        sh:minCount 0 ;
+    ], [
+        sh:path rdfs:subClassOf ;
+        sh:nodeKind sh:IRI ;
+        sh:maxCount 0 ;
+    ].
+
+
+<http://example.com/prov> a void:Dataset;
+  prov:wasGeneratedBy [
+    a setl:Transform, setl:JSLDT;
+    prov:used :table;
+    dcterms:conformsTo <http://example.org/shacl4owl/Class>,
+                       <http://example.org/shacl4owl/ObjectProperty>,
+                       <http://example.org/shacl4owl/DatatypeProperty>;
+    setl:hasContext '''{
+  "owl" : "http://www.w3.org/2002/07/owl#",
+  "rdfs" : "http://www.w3.org/2000/01/rdf-schema#",
+  "skos" : "http://www.w3.org/2004/02/skos/core#",
+  "prov" : "http://www.w3.org/ns/prov#"
+}''';
+    prov:value '''[
+    {
+        "@id": "{{row.URI}}",
+        "@type": "{{row.type}}",
+        "skos:definition": {
+            "@if": "not isempty(row.definition)",
+            "@value": "{{row.definition}}"
+        },
+        "rdfs:label": {
+            "@if": "not isempty(row.label)",
+            "@value": "{{row.label}}"
+        },
+        "rdfs:subClassOf": [
+            {
+                "@if": "not isempty(row.subClassOf) and len(row.subClassOf.strip()) > 0",
+                "@for": "c in row.subClassOf.split('; ')",
+                "@do": {
+                    "@id": "{{c}}"
+                }
+            }
+        ],
+        "rdfs:subPropertyOf": [
+            {
+                "@if": "not isempty(row.subPropertyOf) and len(row.subPropertyOf.strip()) > 0",
+                "@for": "c in row.subPropertyOf.split('; ')",
+                "@do": {
+                    "@id": "{{c}}"
+                }
+            }
+        ]
+    }
+]'''].
+
+<ontology.ttl> a pv:File;
+    dcterms:format "text/turtle";
+    prov:wasGeneratedBy [
+      a setl:Load;
+      prov:used <http://example.com/prov> ;
+    ].
