@@ -36,7 +36,7 @@
     ], [
         sh:path rdfs:subClassOf ;
         sh:nodeKind sh:IRI ;
-        sh:minCount 1 ;
+        sh:minCount 0 ;
     ], [
         sh:path rdfs:subPropertyOf ;
         sh:nodeKind sh:IRI ;
