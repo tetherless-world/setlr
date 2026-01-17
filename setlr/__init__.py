@@ -62,6 +62,9 @@ sys.setrecursionlimit(10000)
 
 from requests_testadapter import Resp
 
+# Regex pattern for extracting Jinja2 template variables (compiled once for performance)
+TEMPLATE_VAR_PATTERN = re.compile(r'\{\{([^}]+)\}\}')
+
 def camelcase(s):
     return slugify(s).title().replace("-","")
 
@@ -616,9 +619,7 @@ def process_row(row, template, rowname, table, resources, transform, variables):
                 logger.error("Error message: %s", str(e))
                 logger.error("Template variables referenced in template:")
                 # Try to extract variable references from the template
-                import re as template_re
-                var_pattern = template_re.compile(r'\{\{([^}]+)\}\}')
-                matches = var_pattern.findall(value)
+                matches = TEMPLATE_VAR_PATTERN.findall(value)
                 if matches:
                     for match in matches:
                         var_name = match.strip().split('.')[0].split('[')[0].strip()
