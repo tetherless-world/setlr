@@ -703,16 +703,19 @@ construct {
         jslt = json.loads(s)
     except json.JSONDecodeError as e:
         logger.error("Error parsing JSON-LD template for transform %s", transform.identifier)
-        logger.error("JSON parsing error at line %d, column %d: %s", e.lineno, e.colno, e.msg)
+        lineno = getattr(e, 'lineno', 0)
+        colno = getattr(e, 'colno', 0)
+        msg = getattr(e, 'msg', str(e))
+        logger.error("JSON parsing error at line %d, column %d: %s", lineno, colno, msg)
         # Show context around the error
         lines = s.split("\n")
-        start_line = max(0, e.lineno - 4)
-        end_line = min(len(lines), e.lineno + 3)
+        start_line = max(0, lineno - 4)
+        end_line = min(len(lines), lineno + 3)
         logger.error("Template context:")
         for i in range(start_line, end_line):
-            prefix = ">>> " if i == e.lineno - 1 else "    "
+            prefix = ">>> " if i == lineno - 1 else "    "
             logger.error("%s%d: %s", prefix, i + 1, lines[i])
-        raise ValueError(f"Invalid JSON-LD template in transform {transform.identifier}: {e.msg} at line {e.lineno}, column {e.colno}") from e
+        raise ValueError(f"Invalid JSON-LD template in transform {transform.identifier}: {msg} at line {lineno}, column {colno}") from e
     except Exception as e:
         logger.error("Error parsing JSON-LD template for transform %s: %s", transform.identifier, str(e))
         logger.error("Template content:\n%s", s[:500])  # Show first 500 chars
