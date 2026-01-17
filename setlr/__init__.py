@@ -409,7 +409,7 @@ def extract(e, resources):
 def isempty(value):
     try:
         return isnan(value)
-    except:
+    except (TypeError, ValueError):
         return value is None
 
 def clone(value):
