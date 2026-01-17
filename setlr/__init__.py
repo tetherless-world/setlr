@@ -508,7 +508,9 @@ def process_row(row, template, rowname, table, resources, transform, variables):
                 except Exception as e:
                     logger.error("=" * 80)
                     logger.error("Error evaluating @if conditional: %s", value['@if'])
-                    logger.error("Transform: %s, Row: %s", env.get('transform', {}).identifier if hasattr(env.get('transform', {}), 'identifier') else 'unknown', env.get('name', 'unknown'))
+                    transform_obj = env.get('transform', {})
+                    transform_id = transform_obj.identifier if hasattr(transform_obj, 'identifier') else 'unknown'
+                    logger.error("Transform: %s, Row: %s", transform_id, env.get('name', 'unknown'))
                     logger.error("Error type: %s", type(e).__name__)
                     logger.error("Error message: %s", str(e))
                     logger.error("Row-specific variables:")
@@ -517,7 +519,7 @@ def process_row(row, template, rowname, table, resources, transform, variables):
                             v = env[key]
                             try:
                                 logger.error("  %s: %s", key, str(v)[:200])
-                            except:
+                            except Exception:
                                 logger.error("  %s: <%s>", key, type(v).__name__)
                     logger.error("=" * 80)
                     raise RuntimeError(f"Error in @if conditional '{value['@if']}': {type(e).__name__}: {str(e)}") from e
@@ -549,7 +551,9 @@ def process_row(row, template, rowname, table, resources, transform, variables):
                 except Exception as e:
                     logger.error("=" * 80)
                     logger.error("Error in @for loop: %s", value['@for'])
-                    logger.error("Transform: %s, Row: %s", env.get('transform', {}).identifier if hasattr(env.get('transform', {}), 'identifier') else 'unknown', env.get('name', 'unknown'))
+                    transform_obj = env.get('transform', {})
+                    transform_id = transform_obj.identifier if hasattr(transform_obj, 'identifier') else 'unknown'
+                    logger.error("Transform: %s, Row: %s", transform_id, env.get('name', 'unknown'))
                     logger.error("Error type: %s", type(e).__name__)
                     logger.error("Error message: %s", str(e))
                     logger.error("Expression: %s", expression)
@@ -587,7 +591,9 @@ def process_row(row, template, rowname, table, resources, transform, variables):
                 except Exception as e:
                     logger.error("=" * 80)
                     logger.error("Error in @with expression: %s", value['@with'])
-                    logger.error("Transform: %s, Row: %s", env.get('transform', {}).identifier if hasattr(env.get('transform', {}), 'identifier') else 'unknown', env.get('name', 'unknown'))
+                    transform_obj = env.get('transform', {})
+                    transform_id = transform_obj.identifier if hasattr(transform_obj, 'identifier') else 'unknown'
+                    logger.error("Transform: %s, Row: %s", transform_id, env.get('name', 'unknown'))
                     logger.error("Error type: %s", type(e).__name__)
                     logger.error("Error message: %s", str(e))
                     logger.error("Expression: %s", expression)
@@ -614,7 +620,9 @@ def process_row(row, template, rowname, table, resources, transform, variables):
             except Exception as e:
                 logger.error("=" * 80)
                 logger.error("Error rendering Jinja2 template: %s", value[:200] if len(value) > 200 else value)
-                logger.error("Transform: %s, Row: %s", env.get('transform', {}).identifier if hasattr(env.get('transform', {}), 'identifier') else 'unknown', env.get('name', 'unknown'))
+                transform_obj = env.get('transform', {})
+                transform_id = transform_obj.identifier if hasattr(transform_obj, 'identifier') else 'unknown'
+                logger.error("Transform: %s, Row: %s", transform_id, env.get('name', 'unknown'))
                 logger.error("Error type: %s", type(e).__name__)
                 logger.error("Error message: %s", str(e))
                 logger.error("Template variables referenced in template:")
@@ -629,12 +637,12 @@ def process_row(row, template, rowname, table, resources, transform, variables):
                                 # XML Element
                                 try:
                                     val = xml.etree.ElementTree.tostring(val).decode('utf-8', errors='replace')[:200]
-                                except:
+                                except Exception:
                                     val = "<XML Element>"
                             else:
                                 try:
                                     val = str(val)[:200]
-                                except:
+                                except Exception:
                                     val = f"<{type(val).__name__}>"
                             logger.error("  %s = %s", var_name, val)
                         else:
