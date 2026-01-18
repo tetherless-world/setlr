@@ -57,6 +57,7 @@ __version__ = '1.0.1'
 # Define what gets imported with "from setlr import *"
 __all__ = [
     'run_setl',
+    '_setl',  # Deprecated but included for backward compatibility with wildcard imports
     'main',
     # Include commonly used utilities
     'read_csv',
@@ -84,7 +85,4 @@ __all__ = [
     'void',
     'shacl',
     'api_vocab',
-    # Keep _setl for backward compatibility but not in __all__ to discourage use
 ]
-
-# Note: _setl is still importable for backward compatibility but not in __all__
