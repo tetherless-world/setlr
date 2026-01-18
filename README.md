@@ -1,5 +1,8 @@
 # setlr: The Semantic Extract, Transform and Load-er
 
+[![Unit Tests](https://github.com/tetherless-world/setlr/actions/workflows/test.yml/badge.svg)](https://github.com/tetherless-world/setlr/actions/workflows/test.yml)
+[![Lint](https://github.com/tetherless-world/setlr/actions/workflows/lint.yml/badge.svg)](https://github.com/tetherless-world/setlr/actions/workflows/lint.yml)
+
 setlr is a tool for generating RDF graphs, including named graphs, from almost any kind of tabular data.
 
 # Installation
