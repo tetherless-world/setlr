@@ -20,7 +20,6 @@ classifiers = [
 requires-python = ">=3.8"
 dependencies = [
     "future",
-    "pip>=9.0.0",
     "cython",
     "numpy",
     "rdflib>=6.0.0",
