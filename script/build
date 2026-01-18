@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Build script: Build the project packages and run all tests and checks
 set -e
+set -o pipefail  # Ensure pipeline failures are caught
 
 # Colors for output
 GREEN='\033[0;32m'
@@ -36,17 +37,38 @@ echo -e "${GREEN}✓${NC} Cleaned build artifacts"
 # Run linting checks
 echo -e "${BLUE}==> Running linting checks${NC}"
 echo "Running flake8..."
-if flake8 setlr/ tests/ --exclude=setlr/iterparse_filter.py 2>&1 | head -20; then
-    echo -e "${GREEN}✓${NC} flake8 passed (showing first 20 lines)"
+
+# Capture flake8 output and exit code
+# Temporarily disable errexit for this block since we want to capture the exit code
+set +e
+FLAKE8_OUTPUT=$(flake8 setlr/ tests/ --exclude=setlr/iterparse_filter.py 2>&1)
+FLAKE8_EXIT=$?
+set -e
+
+# Show first 20 lines of output
+echo "$FLAKE8_OUTPUT" | head -20 || true
+
+if [ $FLAKE8_EXIT -eq 0 ]; then
+    echo -e "${GREEN}✓${NC} flake8 passed - no issues found"
 else
-    echo -e "${YELLOW}⚠${NC} flake8 found issues (expected for existing code)"
+    echo -e "${YELLOW}⚠${NC} flake8 found issues (exit code: ${FLAKE8_EXIT})"
+    echo "  Note: Build continues despite linting issues (pre-existing code has many issues)"
+    echo "  To see all issues: flake8 setlr/ tests/ --exclude=setlr/iterparse_filter.py"
+    # Uncomment the next line to make linting failures stop the build:
+    # exit 1
 fi
 
 # Run tests
 echo -e "${BLUE}==> Running tests${NC}"
 mkdir -p test-results
 
-if nose2 --verbose; then
+# Temporarily disable errexit to capture the test exit code
+set +e
+nose2 --verbose
+TEST_EXIT=$?
+set -e
+
+if [ $TEST_EXIT -eq 0 ]; then
     echo -e "${GREEN}✓${NC} All tests passed"
 else
     echo -e "${RED}✗${NC} Tests failed"
@@ -55,9 +77,14 @@ fi
 
 # Build the package
 echo -e "${BLUE}==> Building package${NC}"
-python -m build
 
-if [ $? -eq 0 ]; then
+# Temporarily disable errexit to capture the build exit code
+set +e
+python -m build
+BUILD_EXIT=$?
+set -e
+
+if [ $BUILD_EXIT -eq 0 ]; then
     echo -e "${GREEN}✓${NC} Package built successfully"
     echo ""
     echo "Build artifacts created:"
