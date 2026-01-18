@@ -1,0 +1,50 @@
+name: Lint
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master, develop ]
+  workflow_dispatch:
+
+jobs:
+  lint:
+    name: Lint Python Code
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+    
+    - name: Install linting tools
+      run: |
+        python -m pip install --upgrade pip
+        pip install flake8 pycodestyle pylint vulture
+    
+    - name: Create lint results directory
+      run: mkdir -p lint-results/py
+    
+    - name: Run flake8
+      continue-on-error: true
+      run: flake8 . > lint-results/py/flake8.txt 2>&1
+    
+    - name: Run pycodestyle
+      continue-on-error: true
+      run: pycodestyle . > lint-results/py/pycodestyle.txt 2>&1
+    
+    - name: Run pylint
+      continue-on-error: true
+      run: |
+        cd ..
+        pylint --rcfile setlr/.pylintrc setlr > setlr/lint-results/py/pylint.txt 2>&1
+    
+    - name: Upload lint results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: lint-results
+        path: lint-results/

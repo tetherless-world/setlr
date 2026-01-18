@@ -1,0 +1,48 @@
+=============================================================================
+BEFORE IMPROVEMENTS:
+=============================================================================
+ERROR:setlr:Error in transform [...] while processing row 1
+ERROR:setlr:Row data: {'ID': '2', 'Name': nan, 'Age': '30'}
+ERROR:setlr:RuntimeError: Error rendering template: UndefinedError: 'float object' has no attribute 'strip'
+
+Issue: "nan" is not immediately clear to all users
+
+=============================================================================
+AFTER IMPROVEMENTS:
+=============================================================================
+ERROR:setlr:Error in transform n74cf27c2d5a74c098be2ad32665a56c0b2 while processing row 1
+ERROR:setlr:Row data: {'ID': '2', 'Name': '<empty/missing>', 'Age': '30'}
+ERROR:setlr:RuntimeError: Error rendering template: UndefinedError: 'float object' has no attribute 'strip'
+
+Improvement: Immediately obvious that Name field is empty!
+
+=============================================================================
+
+=============================================================================
+BEFORE IMPROVEMENTS (JSON Error):
+=============================================================================
+ERROR:setlr:Template context:
+ERROR:setlr:    6:       "email": "{{row.Email}}"
+ERROR:setlr:    7:     }
+ERROR:setlr:    8:   }
+ERROR:setlr:>>> 9: ]
+
+Issue: Can't see where the opening brace is
+
+=============================================================================
+AFTER IMPROVEMENTS (JSON Error):
+=============================================================================
+ERROR:setlr:Template context:
+ERROR:setlr:    2:   "@id": "https://example.com/test3/{{row.ID}}",
+ERROR:setlr:    3:   "profile": {
+ERROR:setlr:    4:     "name": "{{row.Name}}",
+ERROR:setlr:    5:     "contact": {
+ERROR:setlr:    6:       "email": "{{row.Email}}"
+ERROR:setlr:    7:     }
+ERROR:setlr:    8:   }
+ERROR:setlr:>>> 9: ]
+
+Improvement: Now you can see the opening "profile" brace on line 3, making it
+clear that the closing brace is missing!
+
+=============================================================================

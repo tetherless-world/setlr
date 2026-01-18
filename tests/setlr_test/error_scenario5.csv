@@ -1,0 +1,4 @@
+URL,Name,Description
+https://example.com/valid,Alice,Valid URL
+not a valid url,Bob,Invalid URL format
+https://example.com/charlie,Charlie,Another valid

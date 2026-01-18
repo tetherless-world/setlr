@@ -62,6 +62,9 @@ sys.setrecursionlimit(10000)
 
 from requests_testadapter import Resp
 
+# Regex pattern for extracting Jinja2 template variables (compiled once for performance)
+TEMPLATE_VAR_PATTERN = re.compile(r'\{\{([^}]+)\}\}')
+
 def camelcase(s):
     return slugify(s).title().replace("-","")
 
@@ -406,7 +409,7 @@ def extract(e, resources):
 def isempty(value):
     try:
         return isnan(value)
-    except:
+    except (TypeError, ValueError):
         return value is None
 
 def clone(value):
@@ -503,20 +506,29 @@ def process_row(row, template, rowname, table, resources, transform, variables):
                 except TypeError:
                     continue
                 except Exception as e:
-                    trace = sys.exc_info()[2]
-                    logger.error("Error in conditional %s\nRelevant Environment:", value['@if'])
-                    for key, v in list(env.items()):
-                        #if key in value['@if']:
-                        if hasattr(v, 'findall'):
-                            v = xml.etree.ElementTree.tostring(v)
-                        logger.error(key + "\t" + str(v)[:1000])
-                    raise e
+                    logger.error("=" * 80)
+                    logger.error("Error evaluating @if conditional: %s", value['@if'])
+                    transform_obj = env.get('transform', {})
+                    transform_id = transform_obj.identifier if hasattr(transform_obj, 'identifier') else 'unknown'
+                    logger.error("Transform: %s, Row: %s", transform_id, env.get('name', 'unknown'))
+                    logger.error("Error type: %s", type(e).__name__)
+                    logger.error("Error message: %s", str(e))
+                    logger.error("Row-specific variables:")
+                    for key in ['row', 'name']:
+                        if key in env:
+                            v = env[key]
+                            try:
+                                logger.error("  %s: %s", key, str(v)[:200])
+                            except Exception:
+                                logger.error("  %s: <%s>", key, type(v).__name__)
+                    logger.error("=" * 80)
+                    raise RuntimeError(f"Error in @if conditional '{value['@if']}': {type(e).__name__}: {str(e)}") from e
             if '@for' in value:
                 f = value['@for']
                 if isinstance(f, list):
                     f = ' '.join(f)
                 variable_list, expression = f.split(" in ", 1)
-                variable_list = re.split(',\s+', variable_list.strip())
+                variable_list = re.split(r',\s+', variable_list.strip())
                 val = value
                 if '@do' in value:
                     val = value['@do']
@@ -537,17 +549,25 @@ def process_row(row, template, rowname, table, resources, transform, variables):
                 except KeyError:
                     pass
                 except Exception as e:
-                    trace = sys.exc_info()[2]
-                    logger.error("Error in @for: %s", value['@for'])
-                    logger.error("Locals: %s", list(env.keys()))
-                    raise e
+                    logger.error("=" * 80)
+                    logger.error("Error in @for loop: %s", value['@for'])
+                    transform_obj = env.get('transform', {})
+                    transform_id = transform_obj.identifier if hasattr(transform_obj, 'identifier') else 'unknown'
+                    logger.error("Transform: %s, Row: %s", transform_id, env.get('name', 'unknown'))
+                    logger.error("Error type: %s", type(e).__name__)
+                    logger.error("Error message: %s", str(e))
+                    logger.error("Expression: %s", expression)
+                    logger.error("Variables to assign: %s", variable_list)
+                    logger.error("Available variables: %s", sorted([k for k in env.keys() if not k.startswith('_')]))
+                    logger.error("=" * 80)
+                    raise RuntimeError(f"Error in @for loop '{value['@for']}': {type(e).__name__}: {str(e)}") from e
                 continue
             if '@with' in value:
                 f = value['@with']
                 if isinstance(f, list):
                     f = ' '.join(f)
                 expression, variable_list = f.split(" as ", 1)
-                variable_list = re.split(',\s+', variable_list.strip())
+                variable_list = re.split(r',\s+', variable_list.strip())
                 val = value
                 if '@do' in value:
                     val = value['@do']
@@ -569,10 +589,18 @@ def process_row(row, template, rowname, table, resources, transform, variables):
                 except KeyError:
                     pass
                 except Exception as e:
-                    trace = sys.exc_info()[2]
-                    logger.error("Error in with: %s", value['@with'])
-                    logger.error("Locals: %s", list(env.keys()))
-                    raise e
+                    logger.error("=" * 80)
+                    logger.error("Error in @with expression: %s", value['@with'])
+                    transform_obj = env.get('transform', {})
+                    transform_id = transform_obj.identifier if hasattr(transform_obj, 'identifier') else 'unknown'
+                    logger.error("Transform: %s, Row: %s", transform_id, env.get('name', 'unknown'))
+                    logger.error("Error type: %s", type(e).__name__)
+                    logger.error("Error message: %s", str(e))
+                    logger.error("Expression: %s", expression)
+                    logger.error("Variables to assign: %s", variable_list)
+                    logger.error("Available variables: %s", sorted([k for k in env.keys() if not k.startswith('_')]))
+                    logger.error("=" * 80)
+                    raise RuntimeError(f"Error in @with expression '{value['@with']}': {type(e).__name__}: {str(e)}") from e
                 continue
             this = {}
             for child in list(value.items()):
@@ -590,15 +618,37 @@ def process_row(row, template, rowname, table, resources, transform, variables):
                 template = get_template(str(value))
                 this = template.render(**env)
             except Exception as e:
-                trace = sys.exc_info()[2]
-                logger.error("Error in template %s %s", value, type(value))
-                logger.error("Relevant Environment:")
-                for key, v in list(env.items()):
-                    #if key in value:
-                    if hasattr(v, 'findall'):
-                        v = xml.etree.ElementTree.tostring(v)
-                    logger.error(key + "\t" + str(v)[:1000])
-                raise e
+                logger.error("=" * 80)
+                logger.error("Error rendering Jinja2 template: %s", value[:200] if len(value) > 200 else value)
+                transform_obj = env.get('transform', {})
+                transform_id = transform_obj.identifier if hasattr(transform_obj, 'identifier') else 'unknown'
+                logger.error("Transform: %s, Row: %s", transform_id, env.get('name', 'unknown'))
+                logger.error("Error type: %s", type(e).__name__)
+                logger.error("Error message: %s", str(e))
+                logger.error("Template variables referenced in template:")
+                # Try to extract variable references from the template
+                matches = TEMPLATE_VAR_PATTERN.findall(value)
+                if matches:
+                    for match in matches:
+                        var_name = match.strip().split('.')[0].split('[')[0].strip()
+                        if var_name in env:
+                            val = env[var_name]
+                            if type(val).__name__ == 'Element':
+                                # XML Element
+                                try:
+                                    val = xml.etree.ElementTree.tostring(val).decode('utf-8', errors='replace')[:200]
+                                except Exception:
+                                    val = "<XML Element>"
+                            else:
+                                try:
+                                    val = str(val)[:200]
+                                except Exception:
+                                    val = f"<{type(val).__name__}>"
+                            logger.error("  %s = %s", var_name, val)
+                        else:
+                            logger.error("  %s = <NOT FOUND>", var_name)
+                logger.error("=" * 80)
+                raise RuntimeError(f"Error rendering template: {type(e).__name__}: {str(e)}") from e
         else:
             this = value
 
@@ -651,15 +701,25 @@ construct {
     s = transform.value(prov.value).value
     try:
         jslt = json.loads(s)
+    except json.JSONDecodeError as e:
+        logger.error("Error parsing JSON-LD template for transform %s", transform.identifier)
+        lineno = getattr(e, 'lineno', 0)
+        colno = getattr(e, 'colno', 0)
+        msg = getattr(e, 'msg', str(e))
+        logger.error("JSON parsing error at line %d, column %d: %s", lineno, colno, msg)
+        # Show context around the error (8 lines before, 3 after for better bracket matching)
+        lines = s.split("\n")
+        start_line = max(0, lineno - 8)
+        end_line = min(len(lines), lineno + 3)
+        logger.error("Template context:")
+        for i in range(start_line, end_line):
+            prefix = ">>> " if i == lineno - 1 else "    "
+            logger.error("%s%d: %s", prefix, i + 1, lines[i])
+        raise ValueError(f"Invalid JSON-LD template in transform {transform.identifier}: {msg} at line {lineno}, column {colno}") from e
     except Exception as e:
-        trace = sys.exc_info()[2]
-        if 'No JSON object could be decoded' in e.message:
-            logger.error(s)
-        if 'line' in e.message:
-            line = int(re.search("line ([0-9]+)", e.message).group(1))
-            logger.error("Error in parsing JSON Template at line %d:", line)
-            logger.error('\n'.join(["%d: %s"%(i+line-3, x) for i, x in enumerate(s.split("\n")[line-3:line+4])]))
-        raise e
+        logger.error("Error parsing JSON-LD template for transform %s: %s", transform.identifier, str(e))
+        logger.error("Template content:\n%s", s[:500])  # Show first 500 chars
+        raise ValueError(f"Invalid JSON-LD template in transform {transform.identifier}: {str(e)}") from e
     context = transform.value(setl.hasContext)
     if context is not None:
         context = json.loads(context.value)
@@ -709,14 +769,33 @@ construct {
                 #logger.debug("Row "+str(rowname))#+" added "+str(after-before)+" triples.")
                 #sys.stdout.flush()
             except Exception as e:
-                trace = sys.exc_info()[2]
-                if data is not None:
-                    logger.error("Error parsing tree: %s", data)
+                logger.error("=" * 80)
+                logger.error("Error in transform %s while processing row %s", transform.identifier, rowname)
                 if isinstance(table, pandas.DataFrame):
-                    logger.error("Error on %s %s", rowname, row)
+                    # Format row data with better NaN handling
+                    row_dict = {}
+                    for key, value in dict(row).items():
+                        if pandas.isna(value):
+                            row_dict[key] = "<empty/missing>"
+                        else:
+                            row_dict[key] = value
+                    logger.error("Row data: %s", row_dict)
                 else:
-                    logger.error("Error on %s", rowname)
-                raise e
+                    logger.error("Row identifier: %s", rowname)
+                
+                # Try to provide more specific error information
+                error_type = type(e).__name__
+                if "JSON-LD" in str(e) or "json" in str(e).lower():
+                    logger.error("JSON-LD processing error: %s", str(e))
+                    if data is not None:
+                        logger.error("Generated JSON-LD (first 1000 chars):\n%s", data[:1000])
+                elif hasattr(e, 'lineno'):
+                    logger.error("%s at line %d: %s", error_type, e.lineno, str(e))
+                else:
+                    logger.error("%s: %s", error_type, str(e))
+                
+                logger.error("=" * 80)
+                raise RuntimeError(f"Failed to transform row {rowname} in transform {transform.identifier}: {error_type}: {str(e)}") from e
 
     resources[generated.identifier] = result
 

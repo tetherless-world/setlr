@@ -1,0 +1,38 @@
+@prefix prov:          <http://www.w3.org/ns/prov#> .
+@prefix dcterms:       <http://purl.org/dc/terms/> .
+@prefix void:          <http://rdfs.org/ns/void#> .
+@prefix setl:          <http://purl.org/twc/vocab/setl/> .
+@prefix csvw:          <http://www.w3.org/ns/csvw#> .
+@prefix pv:            <http://purl.org/net/provenance/ns#> .
+@prefix :              <http://example.com/setl/> .
+
+# Test Case 2: Complex nested @for with wrong variable reference
+:table2 a csvw:Table, setl:Table;
+  csvw:delimiter ",";
+  prov:wasGeneratedBy [
+    a setl:Extract;
+    prov:used <error_scenario2.csv>;
+  ].
+
+<http://example.com/test2> a void:Dataset;
+  prov:wasGeneratedBy [
+    a setl:Transform, setl:JSLDT;
+    prov:used :table2;
+    prov:value '''[{
+  "@id": "https://example.com/test2/{{row.ID}}",
+  "name": "{{row.Name}}",
+  "tags": [{
+    "@for": "tag in row.Tags.split(';')",
+    "@do": {
+      "@id": "https://example.com/tag/{{tags}}",
+      "label": "{{tag}}"
+    }
+  }]
+}]'''].
+
+<test2.ttl> a pv:File;
+    dcterms:format "text/turtle";
+    prov:wasGeneratedBy [
+      a setl:Load;
+      prov:used <http://example.com/test2> ;
+    ].
