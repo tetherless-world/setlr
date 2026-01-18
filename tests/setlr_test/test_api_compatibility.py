@@ -15,7 +15,7 @@ class TestBackwardCompatibility(unittest.TestCase):
         
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
-            result = setlr._setl(setl_graph)
+            setlr._setl(setl_graph)
             
             # Find our specific deprecation warning
             our_warnings = [warning for warning in w if "_setl()" in str(warning.message)]
@@ -65,7 +65,7 @@ class TestNewAPI(unittest.TestCase):
         
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
-            result = setlr.run_setl(setl_graph)
+            setlr.run_setl(setl_graph)
             
             # Filter to only our deprecation warnings (not rdflib's)
             our_warnings = [warning for warning in w if "_setl()" in str(warning.message)]

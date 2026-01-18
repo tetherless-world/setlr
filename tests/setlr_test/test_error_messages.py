@@ -1,10 +1,7 @@
 import unittest
-import tempfile
-import os
 import logging
 from rdflib import ConjunctiveGraph, Namespace, Literal
 from io import StringIO
-import sys
 
 # Import setlr module
 import setlr

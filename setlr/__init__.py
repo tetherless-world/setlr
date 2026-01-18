@@ -60,6 +60,7 @@ __all__ = [
     '_setl',  # Deprecated but included for backward compatibility with wildcard imports
     'main',
     # Include commonly used utilities
+    'logger',
     'read_csv',
     'read_excel', 
     'read_json',

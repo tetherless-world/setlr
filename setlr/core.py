@@ -1,25 +1,21 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-from builtins import str
-from builtins import next
-from builtins import object
-from rdflib import *
 from rdflib.util import guess_format
 import rdflib
 import csv
 import json
-import sys, collections
+import sys
+import collections
 import requests
 import pandas
 import re
 import os
-from six import text_type as str
+import click
 
 from jinja2 import Template
 from toposort import toposort_flatten
 from numpy import isnan
-import uuid
 import tempfile
 import ijson
 from . import iterparse_filter
@@ -41,26 +37,28 @@ from pyshacl import validate
 
 from .trig_store import TrigStore
 
+from requests_testadapter import Resp
+
+
 def hash(value):
     m = hashlib.sha256()
     m.update(value.encode('utf-8'))
     return m.hexdigest()
 
-csvw = Namespace('http://www.w3.org/ns/csvw#')
-ov = Namespace('http://open.vocab.org/terms/')
-setl = Namespace('http://purl.org/twc/vocab/setl/')
-prov = Namespace('http://www.w3.org/ns/prov#')
-pv = Namespace('http://purl.org/net/provenance/ns#')
-sp = Namespace('http://spinrdf.org/sp#')
-sd = Namespace('http://www.w3.org/ns/sparql-service-description#')
-dc = Namespace('http://purl.org/dc/terms/')
-void = Namespace('http://rdfs.org/ns/void#')
-shacl = Namespace('http://www.w3.org/ns/shacl#')
-api_vocab = Namespace('http://purl.org/linked-data/api/vocab#')
+csvw = rdflib.Namespace('http://www.w3.org/ns/csvw#')
+ov = rdflib.Namespace('http://open.vocab.org/terms/')
+setl = rdflib.Namespace('http://purl.org/twc/vocab/setl/')
+prov = rdflib.Namespace('http://www.w3.org/ns/prov#')
+pv = rdflib.Namespace('http://purl.org/net/provenance/ns#')
+sp = rdflib.Namespace('http://spinrdf.org/sp#')
+sd = rdflib.Namespace('http://www.w3.org/ns/sparql-service-description#')
+dc = rdflib.Namespace('http://purl.org/dc/terms/')
+void = rdflib.Namespace('http://rdfs.org/ns/void#')
+shacl = rdflib.Namespace('http://www.w3.org/ns/shacl#')
+api_vocab = rdflib.Namespace('http://purl.org/linked-data/api/vocab#')
 
 sys.setrecursionlimit(10000)
 
-from requests_testadapter import Resp
 
 # Regex pattern for extracting Jinja2 template variables (compiled once for performance)
 TEMPLATE_VAR_PATTERN = re.compile(r'\{\{([^}]+)\}\}')
@@ -87,11 +85,11 @@ requests_session.mount('file:///', LocalFileAdapter())
 
 datatypeConverters = collections.defaultdict(lambda: str)
 datatypeConverters.update({
-    XSD.string: str,
-    XSD.decimal: float,
-    XSD.integer: int,
-    XSD.float: float,
-    XSD.double: float
+    rdflib.XSD.string: str,
+    rdflib.XSD.decimal: float,
+    rdflib.XSD.integer: int,
+    rdflib.XSD.float: float,
+    rdflib.XSD.double: float
 })
 
 run_samples = -1
@@ -107,9 +105,9 @@ _rdf_formats_to_guess = [
 
 def read_csv(location, result):
     args = dict(
-        sep = result.value(csvw.delimiter, default=Literal(",")).value,
-        #header = result.value(csvw.headerRow, default=Literal(0)).value),
-        skiprows = result.value(csvw.skipRows, default=Literal(0)).value,
+        sep = result.value(csvw.delimiter, default=rdflib.Literal(",")).value,
+        #header = result.value(csvw.headerRow, default=rdflib.Literal(0)).value),
+        skiprows = result.value(csvw.skipRows, default=rdflib.Literal(0)).value,
         dtype=str,
         # dtype = object    # Does not seem to play well with future and python2/3 conversion
     )
@@ -122,8 +120,8 @@ def read_csv(location, result):
 
 def read_graph(location, result, g = None):
     if g is None:
-        g = ConjunctiveGraph()
-    graph = ConjunctiveGraph(store=g.store, identifier=result.identifier)
+        g = rdflib.ConjunctiveGraph()
+    graph = rdflib.ConjunctiveGraph(store=g.store, identifier=result.identifier)
     if len(graph) == 0:
         data = get_content(location, result).read()
         f = guess_format(location)
@@ -131,14 +129,13 @@ def read_graph(location, result, g = None):
             try:
                 graph.parse(data=data, format=fmt)
                 break
-            except Exception as e:
-                #print e
+            except Exception:
                 pass
         if len(graph) == 0:
             logger.error("Could not parse graph: %s", location)
-        if result[RDF.type:OWL.Ontology]:
-            for ontology in graph.subjects(RDF.type, OWL.Ontology):
-                imports = [graph.resource(x) for x in graph.objects(ontology, OWL.imports)]
+        if result[rdflib.RDF.type:rdflib.OWL.Ontology]:
+            for ontology in graph.subjects(rdflib.RDF.type, rdflib.OWL.Ontology):
+                imports = [graph.resource(x) for x in graph.objects(ontology, rdflib.OWL.imports)]
                 for i in imports:
                     read_graph(i.identifier, i, g = g)
     return g
@@ -184,7 +181,7 @@ class FileLikeFromIter(object):
 
     def read(self, n=None):
         if n is None:
-            return self.data + b''.join(l for l in self.iter)
+            return self.data + b''.join(line for line in self.iter)
         else:
             while len(self.data) < n:
                 try:
@@ -212,10 +209,10 @@ def get_content(location, result):
         response = handler(location)
         if response is not None:
             break
-    if result[RDF.type:setl.Tempfile]:
+    if result[rdflib.RDF.type:setl.Tempfile]:
         result = to_tempfile(response)
 
-    for t in result[RDF.type]:
+    for t in result[rdflib.RDF.type]:
         # Do we know how to unpack this?
         if t.identifier in unpackers:
             response = unpackers[t.identifier](response)
@@ -249,9 +246,9 @@ packers = {
 
 def read_excel(location, result):
     args = dict(
-        sheet_name = result.value(setl.sheetname, default=Literal(0)).value,
-        header = [int(x) for x in result.value(csvw.headerRow, default=Literal('0')).value.split(',')],
-        skiprows = result.value(csvw.skipRows, default=Literal(0)).value
+        sheet_name = result.value(setl.sheetname, default=rdflib.Literal(0)).value,
+        header = [int(x) for x in result.value(csvw.headerRow, default=rdflib.Literal('0')).value.split(',')],
+        skiprows = result.value(csvw.skipRows, default=rdflib.Literal(0)).value
     )
     if result.value(csvw.header):
         args['header'] = [result.value(csvw.header).value]
@@ -261,7 +258,7 @@ def read_excel(location, result):
 
 def read_xml(location, result):
     validate_dtd = False
-    if result[RDF.type:setl.DTDValidatedXML]:
+    if result[rdflib.RDF.type:setl.DTDValidatedXML]:
         validate_dtd = True
     f = iterparse_filter.IterParseFilter(validate_dtd=validate_dtd)
     if result.value(setl.xpath) is None:
@@ -289,27 +286,27 @@ extractors = {
     setl.SAS7BDAT : lambda location, result: pandas.read_sas(get_content(location, result), format='sas7bdat'),
     setl.Excel : read_excel,
     csvw.Table : read_csv,
-    OWL.Ontology : read_graph,
+    rdflib.OWL.Ontology : read_graph,
     void.Dataset : read_graph,
     setl.JSON : read_json,
     setl.XML : read_xml,
-    URIRef("https://www.iana.org/assignments/media-types/text/plain") : lambda location, result: get_content(location, result)
+    rdflib.URIRef("https://www.iana.org/assignments/media-types/text/plain") : lambda location, result: get_content(location, result)
 }
 
 
 try:
     from bs4 import BeautifulSoup
     extractors[setl.HTML] = lambda location, result: BeautifulSoup(get_content(location, result).read(), 'html.parser')
-except Exception as e:
+except Exception:
     pass
 
 
 def load_csv(csv_resource):
     column_descriptions = {}
     for col in csv_resource[csvw.column]:
-        label = col.value(RDFS.label).value
+        label = col.value(rdflib.RDFS.label).value
         column_descriptions[label] = col
-    csv_graph = Graph(identifier=csv_resource)
+    csv_graph = rdflib.Graph(identifier=csv_resource)
     s = [x for x in csv.reader(open(str(csv_resource.value(csvw.url).identifier).replace("file://","")),
                    delimiter=str(csv_resource.value(csvw.delimiter,default=",").value),
                    quotechar=str(csv_resource.value(csvw.quoteChar,default='"').value))]
@@ -326,24 +323,24 @@ def load_csv(csv_resource):
                 col_desc = None
                 if h in column_descriptions:
                     col_desc = column_descriptions[h]
-                col = csv_graph.resource(URIRef("urn:col_"+str(h)))
-                col.add(RDFS.label, Literal(h))
-                col.add(ov.csvCol, Literal(j))
+                col = csv_graph.resource(rdflib.URIRef("urn:col_"+str(h)))
+                col.add(rdflib.RDFS.label, rdflib.Literal(h))
+                col.add(ov.csvCol, rdflib.Literal(j))
                 if col_desc is not None:
-                    col.add(RDFS.range, col_desc.value(RDFS.range, default=XSD.string))
+                    col.add(rdflib.RDFS.range, col_desc.value(rdflib.RDFS.range, default=rdflib.XSD.string))
                 properties.append(col)
                 propertyMap[h] = col
             continue
         res = csv_graph.resource(csv_resource.identifier+"_row_"+str(i))
-        res.add(RDF.type, csvw.Row)
-        res.add(csvw.rownum, Literal(i))
+        res.add(rdflib.RDF.type, csvw.Row)
+        res.add(csvw.rownum, rdflib.Literal(i))
         for j, value in enumerate(r):
             if skip_value is not None and skip_value == value:
                 continue
             #print i, j, value
             prop = properties[j]
-            datatype = prop.value(RDFS['range'], default=XSD.string)
-            lit =  Literal(value, datatype=datatype.identifier)
+            datatype = prop.value(rdflib.RDFS['range'], default=rdflib.XSD.string)
+            lit = rdflib.Literal(value, datatype=datatype.identifier)
             #print i, prop.identifier, lit.n3()
             res.add(prop.identifier, lit)
     logger.debug("Table has %s rows, %s columns, and %s triples", len(s), len(header), len(csv_graph))
@@ -377,7 +374,7 @@ def get_order(setl_graph):
     nodes = collections.defaultdict(set)
 
     for typ in actions:
-        for task in setl_graph.subjects(RDF.type, typ):
+        for task in setl_graph.subjects(rdflib.RDF.type, typ):
             task = setl_graph.resource(task)
             for used in task[prov.used]:
                 nodes[task.identifier].add(used.identifier)
@@ -399,7 +396,7 @@ def extract(e, resources):
     for result in e.subjects(prov.wasGeneratedBy):
         if used is None:
             used = result
-        for t in result[RDF.type]:
+        for t in result[rdflib.RDF.type]:
             # Do we know how to generate this?
             if t.identifier in extractors:
                 logger.info("Using %s", used.identifier)
@@ -413,7 +410,7 @@ def isempty(value):
         return value is None
 
 def clone(value):
-    __doc__ = '''This is only a JSON-level cloning of objects. Atomic objects are invariant, and don't need to be cloned.'''
+    '''This is only a JSON-level cloning of objects. Atomic objects are invariant, and don't need to be cloned.'''
     if isinstance(value, list):
         return [x for x in value]
     elif isinstance(value, dict):
@@ -459,23 +456,24 @@ def flatten_lists(o):
 
 def process_row(row, template, rowname, table, resources, transform, variables):
     result = []
-    e = {'row':row,
-         'name': rowname,
-         'table': table,
-         'resources': resources,
-         'template': template,
-         "transform": transform,
-         "setl_graph": transform.graph,
-         "isempty":isempty,
-         "slugify" : slugify,
-         "camelcase" : camelcase,
-         "hash":hash,
-         "isinstance":isinstance,
-         "str":str,
-         "float":float,
-         "int":int,
-         "chain": lambda x: chain(*x),
-         "list":list
+    e = {
+        'row':row,
+        'name': rowname,
+        'table': table,
+        'resources': resources,
+        'template': template,
+        "transform": transform,
+        "setl_graph": transform.graph,
+        "isempty":isempty,
+        "slugify" : slugify,
+        "camelcase" : camelcase,
+        "hash":hash,
+        "isinstance":isinstance,
+        "str":str,
+        "float":float,
+        "int":int,
+        "chain": lambda x: chain(*x),
+        "list":list
     }
     e.update(variables)
     e.update(rdflib.__dict__)
@@ -577,9 +575,7 @@ def process_row(row, template, rowname, table, resources, transform, variables):
                     fn = get_function(expression, list(env.keys()))
                     v = fn(**env)
                     if v is not None:
-                        if len(variable_list) == 1 and not (
-                                isinstance(v, collections.Iterable)
-                                and not isinstance(v, str)):
+                        if (len(variable_list) == 1 and not (isinstance(v, collections.Iterable) and not isinstance(v, str))):
                             v = [v]
                         new_env = dict(env)
                         for i, variable in enumerate(variable_list):
@@ -666,7 +662,7 @@ def json_transform(transform, resources):
     for usage in transform[prov.qualifiedUsage]:
         used = usage.value(prov.entity)
         role = usage.value(prov.hadRole)
-        roleID  = role.value(dc.identifier)
+        roleID = role.value(dc.identifier)
         variables[roleID.value] = resources[used.identifier]
         #print "Using", used.identifier, "as", roleID.value
 
@@ -681,20 +677,20 @@ construct {
    ?target ?p ?o.
 }
 '''
-    shape_graph = Graph()
+    shape_graph = rdflib.Graph()
     for shape in transform.objects(dc.conformsTo):
-        if shape[RDF.type:shacl.NodeShape] or shape[RDF.type:shacl.PropertyShape]:
+        if shape[rdflib.RDF.type:shacl.NodeShape] or shape[rdflib.RDF.type:shacl.PropertyShape]:
             logger.info("Validating against SHACL shape %s", shape.identifier)
             shape_graph += transform.graph.query(connected_downstream_graph,
                                                  initBindings={"source":shape.identifier})
     if generated.identifier in resources:
         result = resources[generated.identifier]
     else:
-        result = ConjunctiveGraph()
-        if generated[RDF.type : setl.Persisted]:
+        result = rdflib.ConjunctiveGraph()
+        if generated[rdflib.RDF.type : setl.Persisted]:
             store = TrigStore()
-            result = ConjunctiveGraph(store=store)
-        if generated[RDF.type : setl.Persisted]:
+            result = rdflib.ConjunctiveGraph(store=store)
+        if generated[rdflib.RDF.type : setl.Persisted]:
             tempdir = tempfile.mktemp()
             logger.info("Persisting %s to %s", generated.identifier, tempdir)
             result.store.open(tempdir, True)
@@ -749,13 +745,13 @@ construct {
 
                 #logger.debug(json.dumps(root, indent=4))
                 #before = len(result)
-                #graph = ConjunctiveGraph(identifier=generated.identifier)
+                #graph = rdflib.ConjunctiveGraph(identifier=generated.identifier)
                 #graph.parse(data=json.dumps(root),format="json-ld")
                 data = json.dumps(root)
                 #del root
                 
                 if len(shape_graph) > 0:
-                    d = ConjunctiveGraph()
+                    d = rdflib.ConjunctiveGraph()
                     d.parse(data=data,format='json-ld')
                     conforms, report, message = validate(d,
                                                          shacl_graph=shape_graph,
@@ -802,49 +798,50 @@ construct {
 def transform(transform_resource, resources):
     logger.info('Transforming %s',transform_resource.identifier)
 
-    transform_graph = ConjunctiveGraph()
+    transform_graph = rdflib.ConjunctiveGraph()
     for result in transform_graph.subjects(prov.wasGeneratedBy):
-        transform_graph = ConjunctiveGraph(identifier=result.identifier)
+        transform_graph = rdflib.ConjunctiveGraph(identifier=result.identifier)
 
     used = set(transform_resource[prov.used])
 
-    for csv in [u for u in used if u[RDF.type:csvw.Table]]:
-        csv_graph = Graph(store=transform_graph.store, identifier=csv)
-        csv_graph += graphs[csv.identifier]
+    for csv_file in [u for u in used if u[rdflib.RDF.type:csvw.Table]]:
+        csv_graph = rdflib.Graph(store=transform_graph.store,
+                                 identifier=csv_file)
+        csv_graph += resources[csv_file.identifier]
 
 
-    for script in [u for u in used if u[RDF.type:setl.PythonScript]]:
+    for script in [u for u in used if u[rdflib.RDF.type:setl.PythonScript]]:
         logger.info("Script: %s", script.identifier)
         s = script.value(prov.value).value
-        l = dict(graph = transform_graph, setl_graph = transform_resource.graph)
-        gl = dict()
-        exec(s, gl, l)
+        local_vars = dict(graph = transform_graph, setl_graph = transform_resource.graph)
+        global_vars = dict()
+        exec(s, global_vars, local_vars)
 
-    for jsldt in [u for u in used if u[RDF.type:setl.PythonScript]]:
+    for jsldt in [u for u in used if u[rdflib.RDF.type:setl.PythonScript]]:
         logger.info("Script: %s", script.identifier)
         s = script.value(prov.value).value
-        l = dict(graph = transform_graph, setl_graph = transform_resource.graph)
-        gl = dict()
-        exec(s, gl, l)
+        local_vars = dict(graph = transform_graph, setl_graph = transform_resource.graph)
+        global_vars = dict()
+        exec(s, global_vars, local_vars)
 
-    for update in [u for u in used if u[RDF.type:sp.Update]]:
+    for update in [u for u in used if u[rdflib.RDF.type:sp.Update]]:
         logger.info("Update: %s", update.identifier)
         query = update.value(prov.value).value
         transform_graph.update(query)
 
-    for construct in [u for u in used if u[RDF.type:sp.Construct]]:
+    for construct in [u for u in used if u[rdflib.RDF.type:sp.Construct]]:
         logger.info("Construct: %s", construct.identifier)
         query = construct.value(prov.value).value
         g = transform_graph.query(query)
         transform_graph += g
 
-    for csv in [u for u in used if u[RDF.type:csvw.Table]]:
-        g = Graph(identifier=csv.identifier,store=transform_graph.store)
+    for csv_file in [u for u in used if u[rdflib.RDF.type:csvw.Table]]:
+        g = rdflib.Graph(identifier=csv_file.identifier,store=transform_graph.store)
         g.remove((None, None, None))
-        transform_graph.store.remove_graph(csv.identifier)
+        transform_graph.store.remove_graph(csv_file.identifier)
 
     for result in transform_graph.subjects(prov.wasGeneratedBy):
-        graphs[result.identifier] = transform_graph
+        resources[result.identifier] = transform_graph
 
 def _load_open(generated):
     if generated.identifier.startswith("file://"):
@@ -855,18 +852,16 @@ def _load_open(generated):
 
     fh = open(filename, 'wb')
     for type, pack in packers.items():
-        if generated[RDF.type : type]:
+        if generated[rdflib.RDF.type : type]:
             return pack(fh)
     return fh
 
 def load(load_resource, resources):
     logger.info('Load %s',load_resource.identifier)
-    file_graph = Dataset(default_union=True)
-    to_disk = False
+    file_graph = rdflib.Dataset(default_union=True)
     for used in load_resource[prov.used]:
-        if used[RDF.type : setl.Persisted]:
-            to_disk = True
-            file_graph = Dataset(store='Sleepycat', default_union=True)
+        if used[rdflib.RDF.type : setl.Persisted]:
+            file_graph = rdflib.Dataset(store='Sleepycat', default_union=True)
             tempdir = tempfile.mkdtemp()
             logger.debug("Gathering %s into %s", load_resource.identifier, tempdir)
             file_graph.store.open(tempdir, True)
@@ -884,7 +879,7 @@ def load(load_resource, resources):
 
     for generated in load_resource.subjects(prov.wasGeneratedBy):
         # TODO: support LDP-based loading
-        if generated[RDF.type:pv.File]:
+        if generated[rdflib.RDF.type:pv.File]:
             fmt = generated.value(dc['format'])
             if fmt is not None:
                 fmt = fmt.value
@@ -894,15 +889,13 @@ def load(load_resource, resources):
             with _load_open(generated) as o:
                 file_graph.serialize(o, format=fmt)
 
-        elif generated[RDF.type:sd.Service]:
+        elif generated[rdflib.RDF.type:sd.Service]:
             from rdflib.plugins.stores.sparqlstore import SPARQLUpdateStore
             endpoint = generated.value(sd.endpoint, default=generated).identifier
             store = SPARQLUpdateStore(endpoint, endpoint, autocommit=False)
-            endpoint_graph = Dataset(store=store, identifier=generated.identifier, default_union=True)
+            endpoint_graph = rdflib.Dataset(store=store, identifier=generated.identifier, default_union=True)
             endpoint_graph.addN(file_graph.quads())
             endpoint_graph.commit()
-    #if to_disk:
-    #    file_graph.close()
 
 
 actions = {
@@ -987,7 +980,7 @@ def run_setl(setl_graph):
     tasks = [setl_graph.resource(t) for t in get_order(setl_graph)]
 
     for task in tasks:
-        action = [actions[t.identifier] for t in task[RDF.type] if t.identifier in actions]
+        action = [actions[t.identifier] for t in task[rdflib.RDF.type] if t.identifier in actions]
         if len(action) > 0:
             action[0](task, resources)
     return resources
@@ -995,7 +988,6 @@ def run_setl(setl_graph):
 
 logger = None
 
-import click
 @click.command()
 @click.option('--quiet', '-q', is_flag=True, default=False, help="Minimize logging.")
 @click.option('-n', default=-1, help="Only process the first N rows.", type=int)
@@ -1020,8 +1012,8 @@ def main(script, rdf_validation=None, text_validation=None, quiet=False, n=-1):
 
     global run_samples
     run_samples = n
-    setl_graph = ConjunctiveGraph()
+    setl_graph = rdflib.ConjunctiveGraph()
     content = open(script).read()
     setl_graph.parse(data=content, format="turtle")
 
-    graphs = run_setl(setl_graph)
+    run_setl(setl_graph)

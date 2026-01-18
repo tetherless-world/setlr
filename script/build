@@ -55,7 +55,7 @@ else
     echo "  Note: Build continues despite linting issues (pre-existing code has many issues)"
     echo "  To see all issues: flake8 setlr/ tests/ --exclude=setlr/iterparse_filter.py"
     # Uncomment the next line to make linting failures stop the build:
-    # exit 1
+    exit 1
 fi
 
 # Run tests
