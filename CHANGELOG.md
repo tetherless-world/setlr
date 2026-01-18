@@ -10,13 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.0.2] - 2026-01-18
 
 ### Changed
-- Version bump for package release
-
-## [1.0.1] - 2026-01-18
-
-### Changed
 - Migrated from `setup.py` to `pyproject.toml` following PEP 517/518 standards for modern Python packaging
-- Restructured codebase: moved implementation from `setlr/__init__.py` to `setlr/core.py` (~916 lines)
+- Restructured codebase: moved implementation from `setlr/__init__.py` to `setlr/core.py` (~1020 lines)
 - `setlr/__init__.py` now serves as a clean public API interface (~90 lines)
 
 ### Added
@@ -25,12 +20,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Improved error messages for NaN/missing values (now displays `<empty/missing>` instead of `nan`)
 - Extended JSON error context from 4 to 8 lines before error for better debugging
 - Comprehensive API documentation with usage examples
+- Development scripts for bootstrap, build, and release
+- GitHub Actions workflows for automated testing and linting
+- Migration documentation (MIGRATION.md)
 
 ### Fixed
 - Improved error reporting for missing data scenarios
 - Better context display for JSON syntax errors in templates
+- Python version compatibility for JSON error handling
 
-## [1.0.0] - 2026-01-18
+## [1.0.1] - 2024-08-09
+
+### Changed
+- Moved version information from `_version.py` directly into `setup.py`
+- Modified `setup.py` to support `--version` flag
+
+### Fixed
+- Fixed SHACL constraint in ontology example (changed `sh:minCount` from 1 to 0 for `rdfs:subClassOf`)
+
+## [1.0.0] - 2024-04-29
 
 ### Added
 - Initial stable release of setlr
@@ -42,6 +50,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Named graph support via ConjunctiveGraph
 - RDF namespaces: csvw, ov, setl, prov, pv, sp, sd, dc, void, shacl
 - Utility functions: `extract()`, `transform()`, `load()`, `hash()`, `camelcase()`
+- SHACL validation support with pyshacl[js]
 - Python 3.8+ support
 - Comprehensive test suite
 
