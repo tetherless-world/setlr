@@ -16,7 +16,7 @@ This repository now includes automated CI/CD workflows using GitHub Actions.
 
 **Steps:**
 1. Checkout code
-2. Set up Python environment with pip caching
+2. Set up Python environment
 3. Install package and test dependencies (nose2, coverage)
 4. Create test results directory
 5. Run full test suite with nose2
@@ -38,7 +38,7 @@ This repository now includes automated CI/CD workflows using GitHub Actions.
 
 **Steps:**
 1. Checkout code
-2. Set up Python 3.11 with pip caching
+2. Set up Python 3.11
 3. Install linting tools (flake8, pycodestyle, pylint, vulture)
 4. Run all linting tools (continues on error)
 5. Upload lint results as artifacts
@@ -89,5 +89,4 @@ The new GitHub Actions workflows provide equivalent functionality to the existin
 1. **Multiple Python Versions**: Tests run on 5 different Python versions for better compatibility assurance
 2. **Native GitHub Integration**: Workflow status visible directly in pull requests
 3. **Free for Public Repos**: No additional CI service costs
-4. **Caching**: Pip dependencies cached for faster builds
-5. **Artifacts**: Test results and coverage reports easily accessible
+4. **Artifacts**: Test results and coverage reports easily accessible
