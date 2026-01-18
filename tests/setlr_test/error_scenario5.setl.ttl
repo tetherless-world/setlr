@@ -1,0 +1,32 @@
+@prefix prov:          <http://www.w3.org/ns/prov#> .
+@prefix dcterms:       <http://purl.org/dc/terms/> .
+@prefix void:          <http://rdfs.org/ns/void#> .
+@prefix setl:          <http://purl.org/twc/vocab/setl/> .
+@prefix csvw:          <http://www.w3.org/ns/csvw#> .
+@prefix pv:            <http://purl.org/net/provenance/ns#> .
+@prefix :              <http://example.com/setl/> .
+
+# Test Case 5: Error in generated JSON-LD (invalid IRI)
+:table5 a csvw:Table, setl:Table;
+  csvw:delimiter ",";
+  prov:wasGeneratedBy [
+    a setl:Extract;
+    prov:used <error_scenario5.csv>;
+  ].
+
+<http://example.com/test5> a void:Dataset;
+  prov:wasGeneratedBy [
+    a setl:Transform, setl:JSLDT;
+    prov:used :table5;
+    prov:value '''[{
+  "@id": "{{row.URL}}",
+  "name": "{{row.Name}}",
+  "description": "{{row.Description}}"
+}]'''].
+
+<test5.ttl> a pv:File;
+    dcterms:format "text/turtle";
+    prov:wasGeneratedBy [
+      a setl:Load;
+      prov:used <http://example.com/test5> ;
+    ].

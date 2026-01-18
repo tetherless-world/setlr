@@ -707,9 +707,9 @@ construct {
         colno = getattr(e, 'colno', 0)
         msg = getattr(e, 'msg', str(e))
         logger.error("JSON parsing error at line %d, column %d: %s", lineno, colno, msg)
-        # Show context around the error
+        # Show context around the error (8 lines before, 3 after for better bracket matching)
         lines = s.split("\n")
-        start_line = max(0, lineno - 4)
+        start_line = max(0, lineno - 8)
         end_line = min(len(lines), lineno + 3)
         logger.error("Template context:")
         for i in range(start_line, end_line):
@@ -772,7 +772,14 @@ construct {
                 logger.error("=" * 80)
                 logger.error("Error in transform %s while processing row %s", transform.identifier, rowname)
                 if isinstance(table, pandas.DataFrame):
-                    logger.error("Row data: %s", dict(row))
+                    # Format row data with better NaN handling
+                    row_dict = {}
+                    for key, value in dict(row).items():
+                        if pandas.isna(value):
+                            row_dict[key] = "<empty/missing>"
+                        else:
+                            row_dict[key] = value
+                    logger.error("Row data: %s", row_dict)
                 else:
                     logger.error("Row identifier: %s", rowname)
                 
