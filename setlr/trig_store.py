@@ -1,7 +1,4 @@
-import logging
-from threading import Thread
-from os.path import exists, abspath
-from os import mkdir
+from os.path import abspath
 from rdflib.store import Store, VALID_STORE, NO_STORE
 from rdflib.term import URIRef
 from urllib.request import pathname2url
@@ -110,7 +107,8 @@ class TrigStore(Store):
         def blocks(files, size=65536):
             while True:
                 b = files.read(size)
-                if not b: break
+                if not b:
+                    break
                 yield b
 
         self.db_env.seek(0)

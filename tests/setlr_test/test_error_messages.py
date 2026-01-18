@@ -1,10 +1,7 @@
 import unittest
-import tempfile
-import os
 import logging
 from rdflib import ConjunctiveGraph, Namespace, Literal
 from io import StringIO
-import sys
 
 # Import setlr module
 import setlr
@@ -19,19 +16,21 @@ class TestErrorMessages(unittest.TestCase):
     
     def setUp(self):
         """Set up logging to capture error messages"""
-        # Initialize the setlr logger
-        setlr.logger = logging.getLogger('setlr')
-        setlr.logger.setLevel(logging.ERROR)
+        # Initialize the setlr.core logger
+        import setlr.core
+        setlr.core.logger = logging.getLogger('setlr')
+        setlr.core.logger.setLevel(logging.ERROR)
         
         self.log_capture = StringIO()
         self.handler = logging.StreamHandler(self.log_capture)
         self.handler.setLevel(logging.ERROR)
-        setlr.logger.addHandler(self.handler)
+        setlr.core.logger.addHandler(self.handler)
         
     def tearDown(self):
         """Clean up logging"""
-        if setlr.logger:
-            setlr.logger.removeHandler(self.handler)
+        import setlr.core
+        if setlr.core.logger:
+            setlr.core.logger.removeHandler(self.handler)
     
     def test_invalid_json_template(self):
         """Test error message when JSON template has syntax errors"""

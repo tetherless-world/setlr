@@ -1,0 +1,53 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "setlr"
+version = "1.0.1"
+description = "setlr is a tool for Semantic Extraction, Transformation, and Loading."
+readme = "README.md"
+license = {text = "Apache License 2.0"}
+authors = [
+    {name = "Jamie McCusker", email = "mccusj@cs.rpi.edu"}
+]
+keywords = ["rdf", "semantic", "etl"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Topic :: Utilities",
+    "License :: OSI Approved :: Apache Software License",
+]
+requires-python = ">=3.8"
+dependencies = [
+    "future",
+    "cython",
+    "numpy",
+    "rdflib>=6.0.0",
+    "pandas>=0.23.0",
+    "requests",
+    "toposort",
+    "beautifulsoup4",
+    "jinja2",
+    "lxml",
+    "six",
+    "xlrd",
+    "ijson",
+    "click",
+    "tqdm",
+    "requests-testadapter",
+    "python-slugify",
+    "pyshacl[js]",
+]
+
+[project.urls]
+Homepage = "http://packages.python.org/setlr"
+
+[project.scripts]
+setlr = "setlr:main"
+
+[tool.setuptools]
+packages = ["setlr"]
+include-package-data = true
+
+[tool.setuptools.package-data]
+setlr = ["**/*"]

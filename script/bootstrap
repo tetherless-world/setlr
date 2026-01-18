@@ -1,0 +1,80 @@
+#!/usr/bin/env bash
+# Bootstrap script: Set up a virtual environment suitable for developing and using the project
+set -e
+
+# Colors for output
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+echo -e "${BLUE}==> Setting up development environment for setlr${NC}"
+
+# Determine project root (one level up from script directory)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+
+cd "${PROJECT_ROOT}"
+
+# Check if Python is available
+if ! command -v python3 &> /dev/null; then
+    echo "Error: python3 is not installed"
+    exit 1
+fi
+
+PYTHON_VERSION=$(python3 --version)
+echo -e "${GREEN}✓${NC} Found ${PYTHON_VERSION}"
+
+# Create virtual environment if it doesn't exist
+VENV_DIR="${PROJECT_ROOT}/venv"
+if [ ! -d "${VENV_DIR}" ]; then
+    echo -e "${BLUE}==> Creating virtual environment at ${VENV_DIR}${NC}"
+    python3 -m venv "${VENV_DIR}"
+    echo -e "${GREEN}✓${NC} Virtual environment created"
+else
+    echo -e "${GREEN}✓${NC} Virtual environment already exists at ${VENV_DIR}"
+fi
+
+# Activate virtual environment
+source "${VENV_DIR}/bin/activate"
+
+# Upgrade pip
+echo -e "${BLUE}==> Upgrading pip${NC}"
+pip install --upgrade pip
+
+# Install the project in editable mode with all dependencies
+echo -e "${BLUE}==> Installing setlr in editable mode${NC}"
+pip install -e .
+
+# Install development and build dependencies
+echo -e "${BLUE}==> Installing development dependencies${NC}"
+pip install \
+    nose2 \
+    coverage \
+    flake8 \
+    pycodestyle \
+    pylint \
+    vulture
+
+echo -e "${BLUE}==> Installing build dependencies${NC}"
+pip install \
+    build \
+    wheel \
+    twine
+
+echo -e "${GREEN}✓${NC} All dependencies installed"
+
+# Display next steps
+echo ""
+echo -e "${GREEN}========================================${NC}"
+echo -e "${GREEN}Bootstrap complete!${NC}"
+echo -e "${GREEN}========================================${NC}"
+echo ""
+echo "To activate the virtual environment, run:"
+echo "  source venv/bin/activate"
+echo ""
+echo "To build the project:"
+echo "  ./script/build"
+echo ""
+echo "To release to PyPI:"
+echo "  ./script/release"
+echo ""
