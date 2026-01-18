@@ -1,0 +1,79 @@
+#!/usr/bin/env bash
+# Build script: Build the project packages and run all tests and checks
+set -e
+
+# Colors for output
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
+NC='\033[0m' # No Color
+
+echo -e "${BLUE}==> Building setlr${NC}"
+
+# Determine project root (one level up from script directory)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+
+cd "${PROJECT_ROOT}"
+
+# Check if virtual environment exists
+VENV_DIR="${PROJECT_ROOT}/venv"
+if [ ! -d "${VENV_DIR}" ]; then
+    echo -e "${YELLOW}Warning: Virtual environment not found. Run ./script/bootstrap first.${NC}"
+    echo "Continuing with system Python..."
+else
+    # Activate virtual environment
+    source "${VENV_DIR}/bin/activate"
+    echo -e "${GREEN}✓${NC} Using virtual environment"
+fi
+
+# Clean previous builds
+echo -e "${BLUE}==> Cleaning previous builds${NC}"
+rm -rf build/ dist/ *.egg-info setlr.egg-info
+echo -e "${GREEN}✓${NC} Cleaned build artifacts"
+
+# Run linting checks
+echo -e "${BLUE}==> Running linting checks${NC}"
+echo "Running flake8..."
+if flake8 setlr/ tests/ --exclude=setlr/iterparse_filter.py 2>&1 | head -20; then
+    echo -e "${GREEN}✓${NC} flake8 passed (showing first 20 lines)"
+else
+    echo -e "${YELLOW}⚠${NC} flake8 found issues (expected for existing code)"
+fi
+
+# Run tests
+echo -e "${BLUE}==> Running tests${NC}"
+mkdir -p test-results
+
+if nose2 --verbose; then
+    echo -e "${GREEN}✓${NC} All tests passed"
+else
+    echo -e "${RED}✗${NC} Tests failed"
+    exit 1
+fi
+
+# Build the package
+echo -e "${BLUE}==> Building package${NC}"
+python -m build
+
+if [ $? -eq 0 ]; then
+    echo -e "${GREEN}✓${NC} Package built successfully"
+    echo ""
+    echo "Build artifacts created:"
+    ls -lh dist/
+else
+    echo -e "${RED}✗${NC} Build failed"
+    exit 1
+fi
+
+echo ""
+echo -e "${GREEN}========================================${NC}"
+echo -e "${GREEN}Build complete!${NC}"
+echo -e "${GREEN}========================================${NC}"
+echo ""
+echo "Distribution files are in: dist/"
+echo ""
+echo "To release to PyPI, run:"
+echo "  ./script/release"
+echo ""

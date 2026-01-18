@@ -1,0 +1,105 @@
+#!/usr/bin/env bash
+# Release script: Upload the current version of the project to PyPI using twine
+set -e
+
+# Colors for output
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
+NC='\033[0m' # No Color
+
+echo -e "${BLUE}==> Releasing setlr to PyPI${NC}"
+
+# Determine project root (one level up from script directory)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+
+cd "${PROJECT_ROOT}"
+
+# Check if virtual environment exists
+VENV_DIR="${PROJECT_ROOT}/venv"
+if [ ! -d "${VENV_DIR}" ]; then
+    echo -e "${YELLOW}Warning: Virtual environment not found. Run ./script/bootstrap first.${NC}"
+    echo "Continuing with system Python..."
+else
+    # Activate virtual environment
+    source "${VENV_DIR}/bin/activate"
+    echo -e "${GREEN}✓${NC} Using virtual environment"
+fi
+
+# Check if dist/ directory exists and has files
+if [ ! -d "dist" ] || [ -z "$(ls -A dist)" ]; then
+    echo -e "${RED}✗${NC} No distribution files found in dist/"
+    echo "Run ./script/build first to create distribution files."
+    exit 1
+fi
+
+# Get version from pyproject.toml
+VERSION=$(grep -E "^version\s*=" pyproject.toml | sed -E 's/.*"(.*)".*/\1/')
+echo -e "${BLUE}==> Releasing version ${VERSION}${NC}"
+
+# Display distribution files
+echo ""
+echo "Distribution files to upload:"
+ls -lh dist/
+echo ""
+
+# Check if twine is installed
+if ! command -v twine &> /dev/null; then
+    echo -e "${RED}✗${NC} twine is not installed"
+    echo "Run ./script/bootstrap to install all dependencies."
+    exit 1
+fi
+
+# Check distribution files with twine
+echo -e "${BLUE}==> Checking distribution files${NC}"
+twine check dist/*
+if [ $? -eq 0 ]; then
+    echo -e "${GREEN}✓${NC} Distribution files are valid"
+else
+    echo -e "${RED}✗${NC} Distribution files have issues"
+    exit 1
+fi
+
+# Prompt for confirmation
+echo ""
+echo -e "${YELLOW}========================================${NC}"
+echo -e "${YELLOW}WARNING: This will upload to PyPI!${NC}"
+echo -e "${YELLOW}========================================${NC}"
+echo ""
+echo "Version: ${VERSION}"
+echo "Files to upload:"
+ls -1 dist/
+echo ""
+read -p "Are you sure you want to release to PyPI? (yes/no): " -r
+echo
+
+if [[ ! $REPLY =~ ^[Yy][Ee][Ss]$ ]]; then
+    echo "Release cancelled."
+    exit 0
+fi
+
+# Upload to PyPI
+echo -e "${BLUE}==> Uploading to PyPI${NC}"
+echo ""
+echo "Note: You will be prompted for your PyPI credentials."
+echo "You can also set TWINE_USERNAME and TWINE_PASSWORD environment variables,"
+echo "or use a PyPI API token (set TWINE_PASSWORD to 'pypi-...' token)."
+echo ""
+
+twine upload dist/*
+
+if [ $? -eq 0 ]; then
+    echo ""
+    echo -e "${GREEN}========================================${NC}"
+    echo -e "${GREEN}Release successful!${NC}"
+    echo -e "${GREEN}========================================${NC}"
+    echo ""
+    echo "Version ${VERSION} has been uploaded to PyPI"
+    echo "View at: https://pypi.org/project/setlr/${VERSION}/"
+    echo ""
+else
+    echo -e "${RED}✗${NC} Upload failed"
+    exit 1
+fi
