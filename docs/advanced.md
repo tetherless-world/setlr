@@ -118,6 +118,7 @@ Load transformed RDF directly to SPARQL endpoints for integration with triple st
 ```turtle
 @prefix setl: <http://purl.org/twc/vocab/setl/> .
 @prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix void: <http://rdfs.org/ns/void#> .
 @prefix sd: <http://www.w3.org/ns/sparql-service-description#> .
 @prefix : <http://example.com/> .
 
@@ -170,6 +171,7 @@ Create SHACL shapes file (`shapes.ttl`):
 
 ```turtle
 @prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 @prefix ex: <http://example.com/> .
 @prefix foaf: <http://xmlns.com/foaf/0.1/> .
 
