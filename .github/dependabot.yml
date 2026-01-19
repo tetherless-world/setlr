@@ -1,0 +1,74 @@
+version: 2
+
+updates:
+  # Python dependencies (pip)
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "automated"
+    groups:
+      # Group development dependencies together
+      development-dependencies:
+        patterns:
+          - "nose2"
+          - "coverage"
+          - "flake8"
+          - "pycodestyle"
+          - "pylint"
+          - "vulture"
+          - "build"
+          - "wheel"
+          - "twine"
+          - "pre-commit"
+        update-types:
+          - "minor"
+          - "patch"
+      
+      # Group production dependencies together  
+      production-dependencies:
+        patterns:
+          - "rdflib"
+          - "pandas"
+          - "jinja2"
+          - "numpy"
+          - "cython"
+          - "requests"
+          - "toposort"
+          - "beautifulsoup4"
+          - "lxml"
+          - "six"
+          - "xlrd"
+          - "ijson"
+          - "click"
+          - "tqdm"
+          - "requests-testadapter"
+          - "python-slugify"
+          - "pyshacl"
+          - "future"
+        update-types:
+          - "minor"
+          - "patch"
+
+  # GitHub Actions dependencies
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "automated"
+      - "github-actions"
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
