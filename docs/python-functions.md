@@ -1,341 +1,230 @@
-# Python Functions in Transforms
+# Python Scripts in Transforms
 
-SETLr allows you to execute custom Python code within SETL transforms using `setl:PythonScript`.
+SETLr allows you to execute custom Python code within transforms using `setl:PythonScript`.
 
 ## Overview
 
 Python scripts in SETLr can:
-- Perform complex data processing
-- Generate RDF triples programmatically
-- Access pandas DataFrames directly
-- Use any Python library
+- Perform complex data processing within transforms
+- Manipulate RDF graphs
+- Access the transform context
+- Execute custom logic
+
+⚠️ **Note**: This is an advanced feature. For most use cases, [JSLDT templates](jsldt.md) are recommended.
 
 ⚠️ **Security Warning**: Python scripts execute with full system access. Only run trusted SETL scripts.
 
-## Basic Python Script
+## Using Python Scripts
+
+Python scripts are used **within** JSLDT transforms to manipulate graphs:
 
 ```turtle
 @prefix setl: <http://purl.org/twc/vocab/setl/> .
 @prefix prov: <http://www.w3.org/ns/prov#> .
 @prefix void: <http://rdfs.org/ns/void#> .
+@prefix csvw: <http://www.w3.org/ns/csvw#> .
 @prefix : <http://example.com/> .
 
-# First, extract your data
-:dataTable a setl:Table ;
+# Extract data
+:dataTable a csvw:Table, setl:Table ;
     prov:wasGeneratedBy [
         a setl:Extract ;
         prov:used <data.csv> ;
     ] .
 
-# Python script transform
+# Transform with JSLDT that uses a Python script
 :processedGraph a void:Dataset ;
     prov:wasGeneratedBy [
-        a setl:PythonScript ;
+        a setl:Transform, setl:JSLDT ;
         prov:used :dataTable ;
-        prov:value '''
-# Access the table as pandas DataFrame
-for index, row in table.iterrows():
-    value = row['Value'] * 2
-    print(f"Processing row {index}: {value}")
-''' ;
+        prov:used [
+            a setl:PythonScript ;
+            prov:value '''
+# Variables available: graph, setl_graph
+print(f"Processing transform with {len(graph)} triples")
+''' 
+        ] ;
+        prov:value '''[{
+            "@id": "http://example.com/{{row.ID}}",
+            "@type": "http://example.com/Item",
+            "http://example.com/name": "{{row.Name}}"
+        }]''' ;
     ] .
 ```
 
 ## Available Variables
 
-Inside Python scripts, you have access to:
+Inside Python scripts within transforms:
 
 | Variable | Type | Description |
 |----------|------|-------------|
-| `table` | pandas.DataFrame | The input table (if `prov:used` references a table) |
-| `result` | rdflib.Graph | Output graph - add triples here |
-| `resources` | dict | All generated resources from the SETL script |
-| `transform` | rdflib.Resource | The current transform resource |
-| `setl_graph` | rdflib.Graph | The SETL script graph |
-| `rdflib` | module | RDFLib library |
-| `RDF`, `RDFS`, `OWL` | Namespace | Common RDF namespaces |
+| `graph` | rdflib.Graph | The transform output graph |
+| `setl_graph` | rdflib.Graph | The SETL script description graph |
 
-## Generating RDF Triples
-
-```turtle
-:peopleGraph a void:Dataset ;
-    prov:wasGeneratedBy [
-        a setl:PythonScript ;
-        prov:used :peopleTable ;
-        prov:value '''
-from rdflib import Namespace, Literal
-from rdflib.namespace import RDF
-
-# Define namespace
-ex = Namespace('http://example.com/')
-foaf = Namespace('http://xmlns.com/foaf/0.1/')
-
-# Generate triples for each row
-for index, row in table.iterrows():
-    person = ex[f"person/{row['ID']}"]
-    result.add((person, RDF.type, foaf.Person))
-    result.add((person, foaf.name, Literal(row['Name'])))
-    result.add((person, foaf.age, Literal(row['Age'])))
-''' ;
-    ] .
-```
-
-## Complex Data Processing
-
-### Example: Data Validation and Filtering
+## Example: Count Triples by Type
 
 ```turtle
 :validatedGraph a void:Dataset ;
     prov:wasGeneratedBy [
-        a setl:PythonScript ;
+        a setl:Transform, setl:JSLDT ;
         prov:used :dataTable ;
-        prov:value '''
-from rdflib import Namespace, Literal
-import re
-
-ex = Namespace('http://example.com/')
-
-# Validate email addresses
-email_pattern = re.compile(r'^[\\w\\.-]+@[\\w\\.-]+\\.\\w+$')
-
-for index, row in table.iterrows():
-    # Skip rows with invalid emails
-    if not email_pattern.match(row['Email']):
-        print(f"Skipping row {index}: invalid email {row['Email']}")
-        continue
-    
-    # Create RDF for valid rows
-    person = ex[f"person/{row['ID']}"]
-    result.add((person, RDF.type, ex.Person))
-    result.add((person, ex.email, Literal(row['Email'])))
-''' ;
-    ] .
-```
-
-### Example: Aggregate Statistics
-
-```turtle
-:statsGraph a void:Dataset ;
-    prov:wasGeneratedBy [
-        a setl:PythonScript ;
-        prov:used :salesTable ;
-        prov:value '''
-from rdflib import Namespace, Literal
+        prov:used [
+            a setl:PythonScript ;
+            prov:value '''
 from rdflib.namespace import RDF
 
-ex = Namespace('http://example.com/')
+# Count triples by type
+types = {}
+for s, p, o in graph.triples((None, RDF.type, None)):
+    t = str(o)
+    types[t] = types.get(t, 0) + 1
 
-# Calculate aggregates
-total_sales = table['Amount'].sum()
-avg_sales = table['Amount'].mean()
-max_sales = table['Amount'].max()
-
-# Add summary triples
-summary = ex.SalesSummary
-result.add((summary, RDF.type, ex.Summary))
-result.add((summary, ex.totalSales, Literal(total_sales)))
-result.add((summary, ex.averageSales, Literal(avg_sales)))
-result.add((summary, ex.maxSales, Literal(max_sales)))
-
-print(f"Processed {len(table)} sales records")
-print(f"Total: ${total_sales:,.2f}")
-''' ;
+print("Triple counts by type:")
+for t, count in sorted(types.items()):
+    print(f"  {t}: {count}")
+'''
+        ] ;
+        prov:value '''[{
+            "@id": "http://example.com/{{row.ID}}",
+            "@type": "http://example.com/Item"
+        }]''' ;
     ] .
 ```
 
-## Using External Libraries
-
-You can import and use any installed Python library:
+## Example: Add Computed Triples
 
 ```turtle
 :enrichedGraph a void:Dataset ;
     prov:wasGeneratedBy [
-        a setl:PythonScript ;
-        prov:used :addressTable ;
-        prov:value '''
+        a setl:Transform, setl:JSLDT ;
+        prov:used :salesTable ;
+        prov:used [
+            a setl:PythonScript ;
+            prov:value '''
 from rdflib import Namespace, Literal
-import requests  # Make HTTP requests
-import json
+from rdflib.namespace import RDF
 
-ex = Namespace('http://example.com/')
-geo = Namespace('http://www.w3.org/2003/01/geo/wgs84_pos#')
+ex = Namespace("http://example.com/")
 
-for index, row in table.iterrows():
-    address = row['Address']
-    
-    # Geocode address (example - use real geocoding service)
-    # response = requests.get(f"https://api.geocode.com?address={address}")
-    # coords = response.json()
-    
-    # For demo, use placeholder coordinates
-    coords = {"lat": 40.7128, "lng": -74.0060}
-    
-    location = ex[f"location/{row['ID']}"]
-    result.add((location, RDF.type, ex.Location))
-    result.add((location, geo.lat, Literal(coords['lat'])))
-    result.add((location, geo.long, Literal(coords['lng'])))
-''' ;
-    ] .
-```
+# Add summary statistics
+total_value = 0
+count = 0
 
-## Accessing Multiple Tables
-
-Use `prov:qualifiedUsage` to reference multiple input tables:
-
-```turtle
-@prefix prov: <http://www.w3.org/ns/prov#> .
-@prefix dcterms: <http://purl.org/dc/terms/> .
-
-:joinedGraph a void:Dataset ;
-    prov:wasGeneratedBy [
-        a setl:PythonScript ;
-        prov:used :employeesTable ;
-        prov:qualifiedUsage [
-            a prov:Usage ;
-            prov:entity :departmentsTable ;
-            prov:hadRole [ dcterms:identifier "departments" ] ;
-        ] ;
-        prov:value '''
-from rdflib import Namespace, Literal
-import pandas as pd
-
-ex = Namespace('http://example.com/')
-
-# 'table' is employeesTable
-# Access departments via resources
-departments = resources['http://example.com/departmentsTable']
-
-# Join tables
-merged = pd.merge(table, departments, on='DeptID', how='left')
-
-# Generate RDF from joined data
-for index, row in merged.iterrows():
-    emp = ex[f"employee/{row['EmpID']}"]
-    result.add((emp, RDF.type, ex.Employee))
-    result.add((emp, ex.name, Literal(row['Name'])))
-    result.add((emp, ex.department, Literal(row['DeptName'])))
-''' ;
-    ] .
-```
-
-## Error Handling
-
-Add error handling in your Python scripts:
-
-```turtle
-:robustGraph a void:Dataset ;
-    prov:wasGeneratedBy [
-        a setl:PythonScript ;
-        prov:used :dataTable ;
-        prov:value '''
-from rdflib import Namespace, Literal
-import traceback
-
-ex = Namespace('http://example.com/')
-errors = []
-
-for index, row in table.iterrows():
+for s, p, o in graph.triples((None, ex.value, None)):
     try:
-        # Process row
-        value = float(row['Value'])
-        item = ex[f"item/{row['ID']}"]
-        result.add((item, ex.value, Literal(value)))
-    except ValueError as e:
-        errors.append(f"Row {index}: {e}")
-    except Exception as e:
-        errors.append(f"Row {index}: Unexpected error: {e}")
+        total_value += float(o)
+        count += 1
+    except:
+        pass
 
-if errors:
-    print(f"Encountered {len(errors)} errors:")
-    for error in errors[:10]:  # Show first 10
-        print(f"  - {error}")
-''' ;
+if count > 0:
+    summary = ex.Summary
+    graph.add((summary, RDF.type, ex.Statistics))
+    graph.add((summary, ex.total, Literal(total_value)))
+    graph.add((summary, ex.average, Literal(total_value / count)))
+    graph.add((summary, ex.count, Literal(count)))
+'''
+        ] ;
+        prov:value '''[{
+            "@id": "http://example.com/sale/{{row.ID}}",
+            "@type": "http://example.com/Sale",
+            "http://example.com/value": "{{row.Value}}"
+        }]''' ;
     ] .
 ```
 
 ## Best Practices
 
-### 1. Keep Scripts Focused
+### 1. Prefer JSLDT Templates
 
-```python
-# Good: Single responsibility
-for index, row in table.iterrows():
-    person = ex[f"person/{row['ID']}"]
-    result.add((person, RDF.type, foaf.Person))
-    result.add((person, foaf.name, Literal(row['Name'])))
+For most transformations, use JSLDT templates instead of Python:
 
-# Avoid: Complex business logic mixed with RDF generation
-# (Consider breaking into multiple transforms)
+```turtle
+# Good: Simple and declarative
+prov:value '''[{
+    "@id": "http://example.com/{{row.ID}}",
+    "@type": "foaf:Person",
+    "foaf:name": "{{row.Name}}"
+}]'''
 ```
 
-### 2. Use Logging
+### 2. Use Python for Post-Processing
+
+Use Python scripts for:
+- Computing aggregates after template processing
+- Adding summary statistics
+- Validating generated RDF
+- Logging and debugging
+
+### 3. Keep Scripts Focused
 
 ```python
-import logging
+# Good: Single purpose
+for s, p, o in graph.triples((None, RDF.type, ex.Item)):
+    count += 1
+print(f"Generated {count} items")
 
-logger = logging.getLogger('setlr')
-logger.info(f"Processing {len(table)} rows")
-
-for index, row in table.iterrows():
-    logger.debug(f"Row {index}: {row['Name']}")
-    # ... process row ...
+# Avoid: Complex multi-purpose scripts
+# (use multiple transforms instead)
 ```
 
-### 3. Validate Input Data
+### 4. Handle Errors Gracefully
 
 ```python
-# Check for required columns
-required_cols = ['ID', 'Name', 'Email']
-missing = [col for col in required_cols if col not in table.columns]
-if missing:
-    raise ValueError(f"Missing required columns: {missing}")
+# Good: Error handling
+try:
+    value = float(row['Value'])
+    # Process value
+except (ValueError, KeyError) as e:
+    print(f"Warning: {e}")
 
-# Check for empty table
-if len(table) == 0:
-    logger.warning("Empty table - no RDF generated")
+# Avoid: Unhandled exceptions that crash the transform
 ```
 
-### 4. Comment Your Code
+## Common Patterns
+
+### Validate Generated RDF
 
 ```python
-# Calculate person's age from birth year
-current_year = 2024
-for index, row in table.iterrows():
-    birth_year = int(row['BirthYear'])
-    age = current_year - birth_year
-    
-    # Only include adults (18+)
-    if age >= 18:
-        person = ex[f"person/{row['ID']}"]
-        result.add((person, foaf.age, Literal(age)))
+# Check for required properties
+from rdflib.namespace import RDF
+ex = Namespace("http://example.com/")
+
+for item in graph.subjects(RDF.type, ex.Item):
+    has_name = (item, ex.name, None) in graph
+    if not has_name:
+        print(f"Warning: {item} missing name property")
 ```
 
-## Performance Tips
-
-- **Use pandas operations**: Vectorized operations are faster than row-by-row iteration
-- **Batch RDF additions**: Group `result.add()` calls when possible
-- **Filter early**: Remove unwanted rows before processing
-- **Profile your code**: Use `cProfile` for slow scripts
+### Add Cross-References
 
 ```python
-# Faster: Use pandas filtering
-adult_mask = table['Age'] >= 18
-adults = table[adult_mask]
+# Link related entities
+ex = Namespace("http://example.com/")
 
-for index, row in adults.iterrows():
-    # Process only adults
-    pass
+items = list(graph.subjects(RDF.type, ex.Item))
+for i, item1 in enumerate(items):
+    for item2 in items[i+1:]:
+        # Add relationship based on some logic
+        graph.add((item1, ex.related, item2))
+```
 
-# Slower: Check condition in loop
-for index, row in table.iterrows():
-    if row['Age'] >= 18:
-        # Process
-        pass
+### Compute Derived Properties
+
+```python
+# Calculate totals, averages, etc.
+from rdflib import Literal
+
+ex = Namespace("http://example.com/")
+total = sum(float(o) for s, p, o in graph.triples((None, ex.price, None)))
+
+summary = ex.PriceSummary
+graph.add((summary, ex.totalPrice, Literal(total)))
 ```
 
 ## Debugging
 
-Enable debug logging to see script execution:
+Enable debug logging:
 
 ```python
 import logging
@@ -347,13 +236,20 @@ setlr.logger.setLevel(logging.DEBUG)
 Add print statements in your script:
 
 ```python
-print(f"Table shape: {table.shape}")
-print(f"Columns: {list(table.columns)}")
-print(f"First row: {table.iloc[0].to_dict()}")
+print(f"Graph has {len(graph)} triples")
+print(f"Types: {set(o for s, p, o in graph.triples((None, RDF.type, None)))}")
 ```
+
+## Limitations
+
+- Python scripts run **after** JSLDT template processing
+- Cannot modify the input table
+- Cannot access row data directly (use JSLDT templates for that)
+- Scripts execute in the transform context
 
 ## See Also
 
+- [JSLDT Template Language](jsldt.md) - Recommended transformation approach
 - [Python API](python-api.md) - Using setlr from Python
-- [JSLDT Template Language](jsldt.md) - Alternative transformation approach
-- [Examples](examples.md) - More Python script examples
+- [Tutorial](tutorial.md) - Step-by-step guide
+- [Examples](examples.md) - Complete examples
