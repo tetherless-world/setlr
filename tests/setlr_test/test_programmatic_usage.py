@@ -80,12 +80,12 @@ class TestProgrammaticUsage(unittest.TestCase):
             # Execute SETL script
             resources = setlr.run_setl(setl_graph)
 
-            # Verify results
-            self.assertIn(str(table), resources, "Table should be in resources")
-            self.assertIn(str(output), resources, "Output graph should be in resources")
+            # Verify results - resources dict uses URIRef as keys
+            self.assertIn(table, resources, "Table should be in resources")
+            self.assertIn(output, resources, "Output graph should be in resources")
 
             # Check output graph has triples
-            output_graph = resources[str(output)]
+            output_graph = resources[output]
             self.assertIsInstance(output_graph, Graph)
             self.assertGreater(len(output_graph), 0, "Output graph should have triples")
 
@@ -108,10 +108,12 @@ class TestProgrammaticUsage(unittest.TestCase):
             setl_graph = Graph()
             setl_graph.bind('setl', setl)
             setl_graph.bind('prov', PROV)
+            setl_graph.bind('csvw', csvw)
 
             # Just extract
             table = ex.testTable
             setl_graph.add((table, RDF.type, setl.Table))
+            setl_graph.add((table, RDF.type, csvw.Table))  # Need csvw.Table for CSV extraction
             
             extract = setl_graph.resource(setl_graph.skolemize())
             extract.add(RDF.type, setl.Extract)
@@ -123,10 +125,10 @@ class TestProgrammaticUsage(unittest.TestCase):
 
             # Check return type
             self.assertIsInstance(resources, dict)
-            self.assertIn(str(table), resources)
+            self.assertIn(table, resources)
 
             # Verify we can access the table
-            table_data = resources[str(table)]
+            table_data = resources[table]
             self.assertIsNotNone(table_data)
 
         finally:
@@ -146,10 +148,12 @@ class TestProgrammaticUsage(unittest.TestCase):
             setl_graph.bind('setl', setl)
             setl_graph.bind('prov', PROV)
             setl_graph.bind('void', void)
+            setl_graph.bind('csvw', csvw)
 
             # Extract
             table = ex.data
             setl_graph.add((table, RDF.type, setl.Table))
+            setl_graph.add((table, RDF.type, csvw.Table))  # Need csvw.Table for CSV extraction
             
             extract = setl_graph.resource(setl_graph.skolemize())
             extract.add(RDF.type, setl.Extract)
@@ -175,19 +179,19 @@ class TestProgrammaticUsage(unittest.TestCase):
             transform2.add(RDF.type, setl.Transform)
             transform2.add(RDF.type, setl.JSLDT)
             transform2.add(PROV.used, table)
-            transform2.add(PROV.value, Literal('[{"@id": "http://example.com/item/{{row.Name}}", "http://example.com/hasValue": {{row.Value}}}]'))
+            transform2.add(PROV.value, Literal('[{"@id": "http://example.com/item/{{row.Name}}", "http://example.com/hasValue": "{{row.Value}}"}]'))
             setl_graph.add((output2, PROV.wasGeneratedBy, transform2.identifier))
 
             # Execute
             resources = setlr.run_setl(setl_graph)
 
             # Verify both outputs were created
-            self.assertIn(str(output1), resources)
-            self.assertIn(str(output2), resources)
+            self.assertIn(output1, resources)
+            self.assertIn(output2, resources)
             
             # Both should be graphs
-            self.assertIsInstance(resources[str(output1)], Graph)
-            self.assertIsInstance(resources[str(output2)], Graph)
+            self.assertIsInstance(resources[output1], Graph)
+            self.assertIsInstance(resources[output2], Graph)
 
         finally:
             os.unlink(csv_file)

@@ -10,7 +10,7 @@ execution within SETL transforms.
 import unittest
 import tempfile
 import os
-from rdflib import Graph, Namespace, Literal, URIRef
+from rdflib import Graph, Namespace, Literal, URIRef, BNode
 from rdflib.namespace import RDF, PROV
 import setlr
 
@@ -39,35 +39,51 @@ class TestPythonFunctions(unittest.TestCase):
             setl_graph.bind('prov', PROV)
             setl_graph.bind('void', void)
             setl_graph.bind('ex', ex)
+            setl_graph.bind('csvw', Namespace('http://www.w3.org/ns/csvw#'))
+            setl_graph.bind('dcterms', Namespace('http://purl.org/dc/terms/'))
+
+            csvw_ns = Namespace('http://www.w3.org/ns/csvw#')
+            dc_ns = Namespace('http://purl.org/dc/terms/')
 
             # Define table extraction
             table = ex.table
             setl_graph.add((table, RDF.type, setl.Table))
+            setl_graph.add((table, RDF.type, csvw_ns.Table))  # Need csvw.Table for CSV extraction
             extract = setl_graph.resource(setl_graph.skolemize())
             extract.add(RDF.type, setl.Extract)
             extract.add(PROV.used, URIRef('file://' + csv_file))
             setl_graph.add((table, PROV.wasGeneratedBy, extract.identifier))
 
-            # Define Python script to double values
-            python_script = setl_graph.resource(setl_graph.skolemize())
-            python_script.add(RDF.type, setl.PythonScript)
-            python_script.add(PROV.used, table)
-            python_script.add(PROV.value, Literal('''
+            # Define Python script with qualifiedDerivation
+            python_script = ex.pythonScript
+            setl_graph.add((python_script, RDF.type, setl.PythonScript))
+            
+            # Use qualifiedDerivation to pass table as 'table' variable
+            qd = BNode()
+            setl_graph.add((qd, PROV.entity, table))
+            role = BNode()
+            setl_graph.add((role, dc_ns.identifier, Literal('table')))
+            setl_graph.add((qd, PROV.hadRole, role))
+            setl_graph.add((python_script, PROV.qualifiedDerivation, qd))
+            
+            setl_graph.add((python_script, PROV.value, Literal('''
+import rdflib
+result = rdflib.Graph()
 for index, row in table.iterrows():
-    result = row['Value'] * 2
-    print(f"Row {row['ID']}: {row['Value']} * 2 = {result}")
+    value = row['Value'] * 2
+    print(f"Row {row['ID']}: {row['Value']} * 2 = {value}")
 '''))
 
             output_graph = ex.output
             setl_graph.add((output_graph, RDF.type, void.Dataset))
-            setl_graph.add((output_graph, PROV.wasGeneratedBy, python_script.identifier))
+            setl_graph.add((output_graph, PROV.wasGeneratedBy, python_script))
 
             # Execute SETL
             resources = setlr.run_setl(setl_graph)
 
             # Verify resources were created
-            self.assertIn(str(table), resources)
-            self.assertIn(str(output_graph), resources)
+            self.assertIn(table, resources)
+            self.assertIn(output_graph, resources)
 
         finally:
             os.unlink(csv_file)
@@ -86,21 +102,37 @@ for index, row in table.iterrows():
             setl_graph = Graph()
             setl_graph.bind('setl', setl)
             setl_graph.bind('prov', PROV)
+            setl_graph.bind('csvw', Namespace('http://www.w3.org/ns/csvw#'))
+            setl_graph.bind('dcterms', Namespace('http://purl.org/dc/terms/'))
+
+            csvw_ns = Namespace('http://www.w3.org/ns/csvw#')
+            dc_ns = Namespace('http://purl.org/dc/terms/')
 
             # Define table
             table = ex.table
             setl_graph.add((table, RDF.type, setl.Table))
+            setl_graph.add((table, RDF.type, csvw_ns.Table))  # Need csvw.Table for CSV extraction
             extract = setl_graph.resource(setl_graph.skolemize())
             extract.add(RDF.type, setl.Extract)
             extract.add(PROV.used, URIRef('file://' + csv_file))
             setl_graph.add((table, PROV.wasGeneratedBy, extract.identifier))
 
-            # Define Python script that creates RDF
-            python_script = setl_graph.resource(setl_graph.skolemize())
-            python_script.add(RDF.type, setl.PythonScript)
-            python_script.add(PROV.used, table)
-            python_script.add(PROV.value, Literal('''
-from rdflib import Namespace, Literal
+            # Define Python script that creates RDF with qualifiedDerivation
+            python_script = ex.pythonScript2
+            setl_graph.add((python_script, RDF.type, setl.PythonScript))
+            
+            # Use qualifiedDerivation to pass table as 'table' variable
+            qd = BNode()
+            setl_graph.add((qd, PROV.entity, table))
+            role = BNode()
+            setl_graph.add((role, dc_ns.identifier, Literal('table')))
+            setl_graph.add((qd, PROV.hadRole, role))
+            setl_graph.add((python_script, PROV.qualifiedDerivation, qd))
+            
+            setl_graph.add((python_script, PROV.value, Literal('''
+from rdflib import Namespace, Literal, Graph
+from rdflib.namespace import RDF
+result = Graph()
 ex_ns = Namespace('http://example.com/')
 for index, row in table.iterrows():
     person = ex_ns[row['Name']]
@@ -110,14 +142,14 @@ for index, row in table.iterrows():
 
             output_graph = ex.output
             setl_graph.add((output_graph, RDF.type, void.Dataset))
-            setl_graph.add((output_graph, PROV.wasGeneratedBy, python_script.identifier))
+            setl_graph.add((output_graph, PROV.wasGeneratedBy, python_script))
 
             # Execute SETL
             resources = setlr.run_setl(setl_graph)
 
             # Verify graph was created with RDF triples
-            if str(output_graph) in resources:
-                graph = resources[str(output_graph)]
+            if output_graph in resources:
+                graph = resources[output_graph]
                 # Check that some triples were generated
                 self.assertGreater(len(graph), 0, "Python script should generate RDF triples")
 
