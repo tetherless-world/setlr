@@ -215,6 +215,9 @@ setlr transform.setl.ttl --rdf-validation shapes.ttl
 
 **Required Properties:**
 ```turtle
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
+
 sh:property [
     sh:path foaf:name ;
     sh:minCount 1 ;  # Required
@@ -223,6 +226,10 @@ sh:property [
 
 **Data Types:**
 ```turtle
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix schema: <http://schema.org/> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
 sh:property [
     sh:path schema:age ;
     sh:datatype xsd:integer ;
@@ -231,6 +238,9 @@ sh:property [
 
 **Value Ranges:**
 ```turtle
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix schema: <http://schema.org/> .
+
 sh:property [
     sh:path schema:age ;
     sh:minInclusive 0 ;
@@ -240,6 +250,9 @@ sh:property [
 
 **Pattern Matching:**
 ```turtle
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
+
 sh:property [
     sh:path foaf:mbox ;
     sh:pattern "^mailto:" ;
