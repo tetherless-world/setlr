@@ -15,6 +15,7 @@ global-exclude __pycache__
 global-exclude *.py[cod]
 global-exclude *.so
 global-exclude .DS_Store
+global-exclude *.egg-info
 recursive-exclude * __pycache__
 recursive-exclude * *.py[cod]
 
