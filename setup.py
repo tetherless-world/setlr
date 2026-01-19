@@ -1,4 +1,3 @@
-import os
 from setuptools import setup
 from sys import argv
 
@@ -9,5 +8,4 @@ if '--version' in argv:
 else:
     # Configuration is now in pyproject.toml
     setup()
-
 
