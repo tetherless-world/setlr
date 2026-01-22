@@ -405,22 +405,6 @@ if __name__ == '__main__':
 
 ## Best Practices
 
-### 1. Modular SETL Scripts
-
-Break complex transformations into modules:
-
-```turtle
-# common.setl.ttl - shared definitions
-@prefix : <http://example.com/> .
-@prefix setl: <http://purl.org/twc/vocab/setl/> .
-
-# users.setl.ttl - user-specific transforms
-@prefix : <http://example.com/> .
-<> owl:imports <common.setl.ttl> .
-
-# Main script imports both
-```
-
 ### 2. Version Control
 
 - Store SETL scripts in version control
