@@ -1,0 +1,148 @@
+name: Feature Request
+description: Suggest a new feature or enhancement for SETLr
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting a new feature! Please provide as much detail as possible about your idea.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem Description
+      description: Is your feature request related to a problem? Please describe what you're trying to accomplish.
+      placeholder: |
+        A clear and concise description of the problem or limitation you're facing.
+        Example: "I'm always frustrated when..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed Solution
+      description: Describe the solution you'd like to see
+      placeholder: |
+        A clear and concise description of what you want to happen.
+        Include:
+        - How it would work
+        - Example usage (code, commands, or configuration)
+        - Expected output or behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: Describe any alternative solutions or features you've considered
+      placeholder: |
+        What other approaches have you thought about?
+        Why would this solution be better than alternatives?
+    validations:
+      required: false
+
+  - type: textarea
+    id: use-case
+    attributes:
+      label: Use Case
+      description: Describe your specific use case for this feature
+      placeholder: |
+        Help us understand how you would use this feature:
+        - What kind of data are you working with?
+        - What is your workflow?
+        - How would this feature improve your experience?
+    validations:
+      required: false
+
+  - type: dropdown
+    id: feature-area
+    attributes:
+      label: Feature Area
+      description: Which area of SETLr does this feature relate to?
+      options:
+        - Data Sources (CSV, Excel, JSON, XML, RDF)
+        - Transformations (JSLDT, Python functions)
+        - SPARQL Integration
+        - CLI Tool
+        - Python API
+        - Documentation
+        - Performance
+        - Validation (SHACL)
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: example
+    attributes:
+      label: Example Code/Configuration
+      description: If applicable, provide example code or configuration showing how the feature would be used
+      placeholder: |
+        ```python
+        # Example usage of the proposed feature
+        from setlr import new_feature
+        
+        result = new_feature(...)
+        ```
+      render: python
+
+  - type: textarea
+    id: documentation
+    attributes:
+      label: Documentation Impact
+      description: What documentation would need to be added or updated?
+      placeholder: |
+        - New tutorial sections
+        - API documentation updates
+        - Example additions
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      description: How important is this feature to you?
+      options:
+        - Critical (blocking my work)
+        - High (would significantly improve my workflow)
+        - Medium (nice to have)
+        - Low (minor improvement)
+    validations:
+      required: false
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional Context
+      description: Add any other context, screenshots, or examples about the feature request
+      placeholder: |
+        - Links to similar features in other tools
+        - Screenshots or diagrams
+        - Research or references
+        - Any other relevant information
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      description: Please confirm the following
+      options:
+        - label: I have searched existing issues and feature requests to ensure this is not a duplicate
+          required: true
+        - label: I have provided a clear description of the problem and proposed solution
+          required: true
+        - label: This feature aligns with SETLr's purpose (RDF generation from tabular data)
+          required: true
+
+  - type: textarea
+    id: contribution
+    attributes:
+      label: Contribution
+      description: Would you be willing to contribute to implementing this feature?
+      placeholder: |
+        - I would like to implement this feature myself
+        - I can help test the implementation
+        - I can help with documentation
+        - I can provide use case examples
