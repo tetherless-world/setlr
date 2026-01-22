@@ -134,18 +134,6 @@ Use conditional logic to selectively process data based on runtime conditions.
 
 ### Streaming Processing
 
-For large XML files, use streaming to reduce memory usage:
-
-```turtle
-:big_xml a setl:Table ;
-    prov:wasGeneratedBy [
-        a setl:Extract ;
-        prov:used <large-file.xml> ;
-        setl:hasXPathSelector "//record" ;
-        setl:streaming true  # Enable streaming
-    ] .
-```
-
 See [Streaming XML documentation](streaming-xml.md) for details.
 
 ### Batch Processing
