@@ -2,6 +2,7 @@
 
 [![Unit Tests](https://github.com/tetherless-world/setlr/actions/workflows/test.yml/badge.svg)](https://github.com/tetherless-world/setlr/actions/workflows/test.yml)
 [![Lint](https://github.com/tetherless-world/setlr/actions/workflows/lint.yml/badge.svg)](https://github.com/tetherless-world/setlr/actions/workflows/lint.yml)
+[![codecov](https://codecov.io/gh/tetherless-world/setlr/branch/main/graph/badge.svg)](https://codecov.io/gh/tetherless-world/setlr)
 
 **SETLr** is a powerful Python tool for generating RDF graphs from tabular data using declarative SETL (Semantic Extract, Transform, Load) scripts.
 
@@ -143,12 +144,13 @@ flake8 setlr/
 
 ## Contributing
 
-Contributions are welcome! Please:
-1. Fork the repository
-2. Create a feature branch
-3. Add tests for new functionality
-4. Ensure all tests pass
-5. Submit a pull request
+Contributions are welcome! Please see our [Contributing Guide](CONTRIBUTING.md) for details on:
+- Development setup and workflow
+- Code standards and style guidelines
+- Testing requirements
+- Pull request process
+
+Please note that this project follows a [Code of Conduct](CODE_OF_CONDUCT.md). By participating, you are expected to uphold this code.
 
 ## License
 
@@ -172,3 +174,4 @@ If you use SETLr in your research, please cite:
 - 📖 [Documentation](docs/README.md)
 - 🐛 [Issue Tracker](https://github.com/tetherless-world/setlr/issues)
 - 💬 [Discussions](https://github.com/tetherless-world/setlr/discussions)
+- 🔒 [Security Policy](SECURITY.md) - Report security vulnerabilities

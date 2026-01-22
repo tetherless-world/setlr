@@ -30,6 +30,12 @@ jobs:
     - name: Build project
       run: ./script/build
     
+    - name: Check distribution packages
+      if: matrix.python-version == '3.11'
+      run: |
+        pip install twine
+        twine check dist/*
+    
     - name: Upload build artifacts
       if: always()
       uses: actions/upload-artifact@v4
