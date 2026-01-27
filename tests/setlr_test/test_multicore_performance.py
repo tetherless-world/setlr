@@ -126,9 +126,10 @@ class TestMulticorePerformance(unittest.TestCase):
                 f.write(f'{i},Name{i}\n')
             csv_file = f.name
 
+        # Set SETLR_MAX_WORKERS to 2
+        original_env = os.environ.get('SETLR_MAX_WORKERS')
+        
         try:
-            # Set SETLR_MAX_WORKERS to 2
-            original_env = os.environ.get('SETLR_MAX_WORKERS')
             os.environ['SETLR_MAX_WORKERS'] = '2'
 
             # Build SETL graph
@@ -164,13 +165,14 @@ class TestMulticorePerformance(unittest.TestCase):
             output_graph = resources[output]
             self.assertGreater(len(output_graph), 0)
 
+        finally:
             # Restore environment
             if original_env is not None:
                 os.environ['SETLR_MAX_WORKERS'] = original_env
             else:
                 os.environ.pop('SETLR_MAX_WORKERS', None)
-
-        finally:
+            
+            # Clean up CSV file
             os.unlink(csv_file)
 
     def test_parallel_processing_order_independence(self):

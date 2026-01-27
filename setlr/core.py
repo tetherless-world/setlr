@@ -666,19 +666,28 @@ def _process_single_row(row, rowname, jslt, generated_id, context, table, resour
     Args:
         row: The row data to process
         rowname: The row identifier/index
-        jslt: The parsed JSON-LD template
+        jslt: The parsed JSON-LD template (read-only)
         generated_id: The identifier for the generated resource
-        context: Optional JSON-LD context
-        table: The source table (for reference)
-        resources: Resources dictionary
-        transform: The transform resource
-        variables: Variables dictionary for template processing
-        shape_graph: SHACL shape graph for validation
+        context: Optional JSON-LD context (read-only)
+        table: The source table (for reference, read-only)
+        resources: Resources dictionary (read-only during row processing)
+        transform: The transform resource (read-only)
+        variables: Variables dictionary for template processing (read-only)
+        shape_graph: SHACL shape graph for validation (read-only)
     
     Returns:
         tuple: (rowname, data_string) where data_string is the JSON-LD as a string,
                or (rowname, None) if row should be skipped
+    
+    Note:
+        All mutable parameters (resources, transform, variables, etc.) are treated as
+        read-only during parallel processing to ensure thread safety. The only shared
+        mutable state is the result graph, which is updated sequentially after row
+        processing completes.
     """
+    # Get logger instance for this thread
+    thread_logger = logging.getLogger('setlr')
+    
     try:
         root = {
             "@id": generated_id,
@@ -702,8 +711,8 @@ def _process_single_row(row, rowname, jslt, generated_id, context, table, resour
         
         return (rowname, data)
     except Exception as e:
-        logger.error("=" * 80)
-        logger.error("Error in transform %s while processing row %s", transform.identifier, rowname)
+        thread_logger.error("=" * 80)
+        thread_logger.error("Error in transform %s while processing row %s", transform.identifier, rowname)
         if isinstance(table, pandas.DataFrame):
             # Format row data with better NaN handling
             row_dict = {}
@@ -712,20 +721,20 @@ def _process_single_row(row, rowname, jslt, generated_id, context, table, resour
                     row_dict[key] = "<empty/missing>"
                 else:
                     row_dict[key] = value
-            logger.error("Row data: %s", row_dict)
+            thread_logger.error("Row data: %s", row_dict)
         else:
-            logger.error("Row identifier: %s", rowname)
+            thread_logger.error("Row identifier: %s", rowname)
         
         # Try to provide more specific error information
         error_type = type(e).__name__
         if "JSON-LD" in str(e) or "json" in str(e).lower():
-            logger.error("JSON-LD processing error: %s", str(e))
+            thread_logger.error("JSON-LD processing error: %s", str(e))
         elif hasattr(e, 'lineno'):
-            logger.error("%s at line %d: %s", error_type, e.lineno, str(e))
+            thread_logger.error("%s at line %d: %s", error_type, e.lineno, str(e))
         else:
-            logger.error("%s: %s", error_type, str(e))
+            thread_logger.error("%s: %s", error_type, str(e))
         
-        logger.error("=" * 80)
+        thread_logger.error("=" * 80)
         raise RuntimeError(f"Failed to transform row {rowname} in transform {transform.identifier}: {error_type}: {str(e)}") from e
 
 def json_transform(transform, resources):
