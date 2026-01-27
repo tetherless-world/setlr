@@ -211,6 +211,27 @@ departments_df = resources[table2]
 
 ## Configuration
 
+### Multicore Processing
+
+SETLr automatically uses multiple CPU cores for parallel processing:
+
+```python
+import os
+import setlr
+
+# Configure number of workers (default: all CPU cores)
+os.environ['SETLR_MAX_WORKERS'] = '4'
+
+# Execute with configured workers
+resources = setlr.run_setl(setl_graph)
+```
+
+**Details:**
+- JSON-LD transform row processing runs in parallel
+- Graph updates are automatically synchronized
+- Set to `1` for single-threaded debugging
+- Set to `0` or omit to use all available CPU cores
+
 ### Logging
 
 SETLr uses Python's logging module:
