@@ -707,7 +707,7 @@ def _process_single_row(row, rowname, jslt, generated_id, context, table, resour
                                                  advanced=True,
                                                  debug=False)
             if not conforms:
-                print(message)
+                thread_logger.warning("SHACL validation failed for row %s:\n%s", rowname, message)
         
         return (rowname, data)
     except Exception as e:
@@ -856,8 +856,10 @@ construct {
             }
             
             # Process completed tasks and update result graph sequentially
-            # Using tqdm for progress bar
-            for future in tqdm(as_completed(future_to_row), total=len(future_to_row)):
+            # Note: as_completed returns futures in completion order (non-deterministic),
+            # but tqdm correctly tracks the count of completed tasks
+            for future in tqdm(as_completed(future_to_row), total=len(future_to_row), 
+                              desc=f"Processing {t.identifier}"):
                 rowname, row = future_to_row[future]
                 try:
                     row_id, data = future.result()
