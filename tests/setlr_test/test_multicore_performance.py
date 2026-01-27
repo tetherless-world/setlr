@@ -111,9 +111,6 @@ class TestMulticorePerformance(unittest.TestCase):
             self.assertEqual(len(person_names), 1)
             self.assertEqual(str(person_names[0]), "Person0")
 
-            print(f"\nProcessed 100 rows in {elapsed_time:.3f} seconds")
-            print(f"Generated {actual_triples} triples")
-
         finally:
             os.unlink(csv_file)
 

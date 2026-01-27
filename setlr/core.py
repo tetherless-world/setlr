@@ -804,7 +804,13 @@ construct {
     
     # Determine number of worker threads for parallel processing
     # Use all available CPU cores by default, but allow override via environment variable
-    max_workers = int(os.environ.get('SETLR_MAX_WORKERS', 0))
+    max_workers = 0
+    try:
+        max_workers = int(os.environ.get('SETLR_MAX_WORKERS', 0))
+    except (ValueError, TypeError):
+        logger.warning("Invalid SETLR_MAX_WORKERS value, using automatic detection")
+        max_workers = 0
+    
     if max_workers <= 0:
         max_workers = multiprocessing.cpu_count()
     
