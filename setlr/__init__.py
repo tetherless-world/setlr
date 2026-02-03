@@ -20,6 +20,8 @@ from .core import (
     main,
     
     # Utility functions that might be used by library users
+    FileLikeFromIter,
+    content_handlers,
     read_csv,
     read_excel,
     read_json,
@@ -61,6 +63,8 @@ __all__ = [
     'main',
     # Include commonly used utilities
     'logger',
+    'FileLikeFromIter',
+    'content_handlers',
     'read_csv',
     'read_excel', 
     'read_json',

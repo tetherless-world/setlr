@@ -1,7 +1,7 @@
 from setuptools import setup
 from sys import argv
 
-__version__='1.0.2'
+__version__='1.0.3'
 
 if '--version' in argv:
     print(__version__)
