@@ -10,7 +10,7 @@
 
 ✨ **Multiple Data Sources**: CSV, Excel, JSON, XML, RDF, SAS files  
 🔄 **Flexible Transformations**: JSON-LD templates with Jinja2, Python functions, SPARQL  
-⚡ **High Performance**: Streaming XML parsing, pandas DataFrames, progress tracking  
+⚡ **High Performance**: Multicore processing, streaming XML parsing, pandas DataFrames, progress tracking  
 🐍 **Python Integration**: Use as library or CLI tool  
 ✅ **Validation**: Built-in SHACL validation  
 📝 **Well Documented**: Comprehensive guides and API reference  

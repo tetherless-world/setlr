@@ -23,6 +23,8 @@ from . import iterparse_filter
 import xml.etree.ElementTree
 
 from itertools import chain
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import multiprocessing
 
 import zipfile
 import gzip
@@ -655,6 +657,86 @@ def process_row(row, template, rowname, table, resources, transform, variables):
 
     return flatten_lists(result)
 
+def _process_single_row(row, rowname, jslt, generated_id, context, table, resources, 
+                        transform, variables, shape_graph):
+    """
+    Process a single row and return the JSON-LD data string.
+    This function is designed to be called in parallel across multiple cores.
+    
+    Args:
+        row: The row data to process
+        rowname: The row identifier/index
+        jslt: The parsed JSON-LD template (read-only)
+        generated_id: The identifier for the generated resource
+        context: Optional JSON-LD context (read-only)
+        table: The source table (for reference, read-only)
+        resources: Resources dictionary (read-only during row processing)
+        transform: The transform resource (read-only)
+        variables: Variables dictionary for template processing (read-only)
+        shape_graph: SHACL shape graph for validation (read-only)
+    
+    Returns:
+        tuple: (rowname, data_string) where data_string is the JSON-LD as a string,
+               or (rowname, None) if row should be skipped
+    
+    Note:
+        All mutable parameters (resources, transform, variables, etc.) are treated as
+        read-only during parallel processing to ensure thread safety. The only shared
+        mutable state is the result graph, which is updated sequentially after row
+        processing completes.
+    """
+    # Get logger instance for this thread
+    thread_logger = logging.getLogger('setlr')
+    
+    try:
+        root = {
+            "@id": generated_id,
+            "@graph": process_row(row, jslt, rowname, table, resources, transform, variables)
+        }
+        if context is not None:
+            root['@context'] = context
+        
+        data = json.dumps(root)
+        
+        # Perform SHACL validation if needed (validation can happen in parallel)
+        if len(shape_graph) > 0:
+            d = rdflib.ConjunctiveGraph()
+            d.parse(data=data, format='json-ld')
+            conforms, report, message = validate(d,
+                                                 shacl_graph=shape_graph,
+                                                 advanced=True,
+                                                 debug=False)
+            if not conforms:
+                thread_logger.warning("SHACL validation failed for row %s:\n%s", rowname, message)
+        
+        return (rowname, data)
+    except Exception as e:
+        thread_logger.error("=" * 80)
+        thread_logger.error("Error in transform %s while processing row %s", transform.identifier, rowname)
+        if isinstance(table, pandas.DataFrame):
+            # Format row data with better NaN handling
+            row_dict = {}
+            for key, value in dict(row).items():
+                if pandas.isna(value):
+                    row_dict[key] = "<empty/missing>"
+                else:
+                    row_dict[key] = value
+            thread_logger.error("Row data: %s", row_dict)
+        else:
+            thread_logger.error("Row identifier: %s", rowname)
+        
+        # Try to provide more specific error information
+        error_type = type(e).__name__
+        if "JSON-LD" in str(e) or "json" in str(e).lower():
+            thread_logger.error("JSON-LD processing error: %s", str(e))
+        elif hasattr(e, 'lineno'):
+            thread_logger.error("%s at line %d: %s", error_type, e.lineno, str(e))
+        else:
+            thread_logger.error("%s: %s", error_type, str(e))
+        
+        thread_logger.error("=" * 80)
+        raise RuntimeError(f"Failed to transform row {rowname} in transform {transform.identifier}: {error_type}: {str(e)}") from e
+
 def json_transform(transform, resources):
     logger.info("Transform %s", transform.identifier)
     tables = [u for u in transform[prov.used]]
@@ -719,79 +801,74 @@ construct {
     context = transform.value(setl.hasContext)
     if context is not None:
         context = json.loads(context.value)
+    
+    # Determine number of worker threads for parallel processing
+    # Use all available CPU cores by default, but allow override via environment variable
+    max_workers = 0
+    try:
+        max_workers = int(os.environ.get('SETLR_MAX_WORKERS', 0))
+    except (ValueError, TypeError):
+        logger.warning("Invalid SETLR_MAX_WORKERS value, using automatic detection")
+        max_workers = 0
+    
+    if max_workers <= 0:
+        max_workers = multiprocessing.cpu_count()
+    
     for t in tables:
         logger.info("Using %s", t.identifier)
         table = resources[t.identifier]
-        it = table
+        
+        # Collect rows to process
+        rows_to_process = []
         if isinstance(table, pandas.DataFrame):
-            #if run_samples:
-            #    table = table.head()
-            it = tqdm(table.iterrows(), total=table.shape[0])
-            #logger.info("Transforming %s rows.", len(table.index))
+            total_rows = table.shape[0]
+            # Limit rows if run_samples is set
+            if run_samples > 0:
+                total_rows = min(total_rows, run_samples)
+            rows_to_process = [(rowname, row) for rowname, row in table.head(total_rows).iterrows()]
+            logger.info("Processing %d rows with %d workers", len(rows_to_process), max_workers)
         else:
             logger.info("Transform %s", t.identifier)
-        for rowname, row in it:
-            if run_samples > 0 and rowname >= run_samples:
-                break
-            try:
-                root = None
-                data = None
-                root = {
-                    "@id": generated.identifier,
-                    "@graph": process_row(row, jslt, rowname, table, resources, transform, variables)
-                }
-                if context is not None:
-                    root['@context'] = context
-
-                #logger.debug(json.dumps(root, indent=4))
-                #before = len(result)
-                #graph = rdflib.ConjunctiveGraph(identifier=generated.identifier)
-                #graph.parse(data=json.dumps(root),format="json-ld")
-                data = json.dumps(root)
-                #del root
-                
-                if len(shape_graph) > 0:
-                    d = rdflib.ConjunctiveGraph()
-                    d.parse(data=data,format='json-ld')
-                    conforms, report, message = validate(d,
-                                                         shacl_graph=shape_graph,
-                                                         advanced=True,
-                                                         debug=False)
-                    if not conforms:
-                        print(message)
-                result.parse(data=data, format="json-ld")
-                #del data
-                #after = len(result)
-                #logger.debug("Row "+str(rowname))#+" added "+str(after-before)+" triples.")
-                #sys.stdout.flush()
-            except Exception as e:
-                logger.error("=" * 80)
-                logger.error("Error in transform %s while processing row %s", transform.identifier, rowname)
-                if isinstance(table, pandas.DataFrame):
-                    # Format row data with better NaN handling
-                    row_dict = {}
-                    for key, value in dict(row).items():
-                        if pandas.isna(value):
-                            row_dict[key] = "<empty/missing>"
-                        else:
-                            row_dict[key] = value
-                    logger.error("Row data: %s", row_dict)
-                else:
-                    logger.error("Row identifier: %s", rowname)
-                
-                # Try to provide more specific error information
-                error_type = type(e).__name__
-                if "JSON-LD" in str(e) or "json" in str(e).lower():
-                    logger.error("JSON-LD processing error: %s", str(e))
+            # For non-DataFrame iterables, collect into a list
+            for rowname, row in table:
+                if run_samples > 0 and rowname >= run_samples:
+                    break
+                rows_to_process.append((rowname, row))
+        
+        # Process rows in parallel
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            # Submit all row processing tasks
+            future_to_row = {
+                executor.submit(
+                    _process_single_row,
+                    row,
+                    rowname,
+                    jslt,
+                    generated.identifier,
+                    context,
+                    table,
+                    resources,
+                    transform,
+                    variables,
+                    shape_graph
+                ): (rowname, row) 
+                for rowname, row in rows_to_process
+            }
+            
+            # Process completed tasks and update result graph sequentially
+            # Note: as_completed returns futures in completion order (non-deterministic),
+            # but tqdm correctly tracks the count of completed tasks
+            for future in tqdm(as_completed(future_to_row), total=len(future_to_row), 
+                              desc=f"Processing {t.identifier}"):
+                rowname, row = future_to_row[future]
+                try:
+                    row_id, data = future.result()
                     if data is not None:
-                        logger.error("Generated JSON-LD (first 1000 chars):\n%s", data[:1000])
-                elif hasattr(e, 'lineno'):
-                    logger.error("%s at line %d: %s", error_type, e.lineno, str(e))
-                else:
-                    logger.error("%s: %s", error_type, str(e))
-                
-                logger.error("=" * 80)
-                raise RuntimeError(f"Failed to transform row {rowname} in transform {transform.identifier}: {error_type}: {str(e)}") from e
+                        # This is the thread-safe bottleneck: sequential parsing into result graph
+                        result.parse(data=data, format="json-ld")
+                except Exception as e:
+                    # Error already logged in _process_single_row
+                    raise
 
     resources[generated.identifier] = result
 
